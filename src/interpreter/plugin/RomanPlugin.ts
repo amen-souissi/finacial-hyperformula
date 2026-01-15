@@ -7,15 +7,19 @@ import {CellError, ErrorType} from '../../Cell'
 import {ErrorMessage} from '../../error-message'
 import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
-import {getRawValue, InterpreterValue, RawScalarValue} from '../InterpreterValue'
+import {getRawPrecisionValue, InterpreterValue, RawScalarValue, isExtendedNumber} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class RomanPlugin extends FunctionPlugin implements FunctionPluginTypecheck<RomanPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'ROMAN': {
       method: 'roman',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1, lessThan: 4000},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1, lessThan: 4000},
         {argumentType: FunctionArgumentType.NOERROR, optionalArg: true, defaultValue: 0}
       ],
     },
@@ -27,31 +31,41 @@ export class RomanPlugin extends FunctionPlugin implements FunctionPluginTypeche
     },
   }
 
+  
+  /**
+   *
+   */
   public roman(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ROMAN'),
-      (val: number, mode: RawScalarValue) => {
-        val = Math.trunc(val)
+      (valArg: Numeric, mode: RawScalarValue) => {
+        // Safe: integer value for Roman numeral - no precision impact
+        const val = valArg.trunc().toNumber()
         if (mode === false) {
           mode = 4
         } else if (mode === true) {
           mode = 0
         }
-        mode = getRawValue(this.coerceScalarToNumberOrError(mode))
-        if (mode instanceof CellError) {
-          return mode
+        const coercedMode = this.coerceScalarToNumberOrError(mode)
+        if (coercedMode instanceof CellError) {
+          return coercedMode
         }
-        mode = Math.trunc(mode)
-        if (mode < 0) {
+        // Roman numeral mode is a small integer (0-4) - no precision impact.
+        const modeNum = isExtendedNumber(coercedMode) ? Math.trunc(getRawPrecisionValue(coercedMode).toNumber()) : 0  // Safe: integer 0-4
+        if (modeNum < 0) {
           return new CellError(ErrorType.VALUE, ErrorMessage.ValueSmall)
         }
-        if (mode > 4) {
+        if (modeNum > 4) {
           return new CellError(ErrorType.VALUE, ErrorMessage.ValueLarge)
         }
-        return romanMode(val, mode)
+        return romanMode(val, modeNum)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public arabic(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ARABIC'),
       (inputString: string) => {
@@ -126,6 +140,9 @@ export class RomanPlugin extends FunctionPlugin implements FunctionPluginTypeche
   }
 }
 
+/**
+ *
+ */
 function eatToken(inputAcc: { input: string, acc: number }, ...tokens: { token: string, val: number }[]) {
   for (const token of tokens) {
     if (inputAcc.input.startsWith(token.token)) {
@@ -136,6 +153,9 @@ function eatToken(inputAcc: { input: string, acc: number }, ...tokens: { token: 
   }
 }
 
+/**
+ *
+ */
 function romanMode(input: number, mode: number): string {
   const work = {val: input % 1000, acc: 'M'.repeat(Math.floor(input / 1000))}
   if (mode === 4) {
@@ -179,6 +199,9 @@ function romanMode(input: number, mode: number): string {
   return work.acc
 }
 
+/**
+ *
+ */
 function absorb(valAcc: { val: number, acc: string }, token: string, lower: number, upper: number) {
   if (valAcc.val >= lower && valAcc.val < upper) {
     valAcc.val -= lower

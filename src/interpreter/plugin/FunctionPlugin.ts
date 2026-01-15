@@ -27,7 +27,7 @@ import {InterpreterState} from '../InterpreterState'
 import {
   ExtendedNumber,
   FormatInfo,
-  getRawValue,
+  getRawPrecisionValue,
   InternalScalarValue,
   InterpreterValue,
   isExtendedNumber,
@@ -36,6 +36,7 @@ import {
   RawScalarValue
 } from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
+import {NumericProvider} from '../../Numeric'
 
 export interface ImplementedFunctions {
   [formulaId: string]: FunctionMetadata,
@@ -180,7 +181,8 @@ export enum FunctionArgumentType {
   INTEGER = 'INTEGER',
 
   /**
-   * String representing complex number.
+   * Complex number type using high-precision Numeric.
+   * The callback receives a complex object ([Numeric, Numeric]).
    */
   COMPLEX = 'COMPLEX',
 
@@ -188,6 +190,13 @@ export enum FunctionArgumentType {
    * Range or scalar.
    */
   ANY = 'ANY',
+
+  /**
+   * High-precision numeric type (Numeric).
+   * Use this for financial/scientific calculations that require precision.
+   * The callback receives a Numeric object instead of a native number.
+   */
+  NUMERIC = 'NUMERIC',
 }
 
 export interface FunctionArgument {
@@ -272,14 +281,26 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     this.arithmeticHelper = interpreter.arithmeticHelper
   }
 
+  
+  /**
+   *
+   */
   protected evaluateAst(ast: Ast, state: InterpreterState): InterpreterValue {
     return this.interpreter.evaluateAst(ast, state)
   }
 
+  
+  /**
+   *
+   */
   protected arraySizeForAst(ast: Ast, state: InterpreterState): ArraySize {
     return this.arraySizePredictor.checkArraySizeForAst(ast, state)
   }
 
+  
+  /**
+   *
+   */
   protected listOfScalarValues(asts: Ast[], state: InterpreterState): [InternalScalarValue, boolean][] {
     const ret: [InternalScalarValue, boolean][] = []
     for (const argAst of asts) {
@@ -297,6 +318,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
 
   protected coerceScalarToNumberOrError = (arg: InternalScalarValue): ExtendedNumber | CellError => this.arithmeticHelper.coerceScalarToNumberOrError(arg)
 
+  
+  /**
+   *
+   */
   protected coerceToType(arg: InterpreterValue, coercedType: FunctionArgument, state: InterpreterState): Maybe<InterpreterValue | complex | RawNoErrorScalarValue> {
     let ret
     if (arg instanceof SimpleRangeValue) {
@@ -325,20 +350,23 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
             break
           }
           // eslint-disable-next-line no-case-declarations
-          const value = getRawValue(coerced)
-          if (coercedType.maxValue !== undefined && value > coercedType.maxValue) {
+          const precisionValue = getRawPrecisionValue(coerced)
+          // Use Numeric comparisons to preserve precision during validation
+          // eslint-disable-next-line no-case-declarations
+          const factory = NumericProvider.getGlobalFactory()
+          if (coercedType.maxValue !== undefined && precisionValue.greaterThan(factory.fromNumber(coercedType.maxValue))) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
           }
-          if (coercedType.minValue !== undefined && value < coercedType.minValue) {
+          if (coercedType.minValue !== undefined && precisionValue.lessThan(factory.fromNumber(coercedType.minValue))) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          if (coercedType.lessThan !== undefined && value >= coercedType.lessThan) {
+          if (coercedType.lessThan !== undefined && precisionValue.greaterThanOrEqualTo(factory.fromNumber(coercedType.lessThan))) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
           }
-          if (coercedType.greaterThan !== undefined && value <= coercedType.greaterThan) {
+          if (coercedType.greaterThan !== undefined && precisionValue.lessThanOrEqualTo(factory.fromNumber(coercedType.greaterThan))) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          if (coercedType.argumentType === FunctionArgumentType.INTEGER && !Number.isInteger(value)) {
+          if (coercedType.argumentType === FunctionArgumentType.INTEGER && !precisionValue.isInteger()) {
             return new CellError(ErrorType.NUM, ErrorMessage.IntegerExpected)
           }
           ret = coerced
@@ -361,13 +389,44 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
           ret = coerceToRange(arg)
           break
         case FunctionArgumentType.COMPLEX:
-          return this.arithmeticHelper.coerceScalarToComplex(getRawValue(arg))
+          // High-precision complex type - returns complex ([Numeric, Numeric]) directly
+          return this.arithmeticHelper.coerceScalarToComplex(arg)
+        case FunctionArgumentType.NUMERIC: {
+          // High-precision numeric type - returns Numeric directly without conversion to native number
+          const coercedNumeric = this.coerceScalarToNumberOrError(arg)
+          if (!isExtendedNumber(coercedNumeric)) {
+            return coercedNumeric // Return error
+          }
+          const numericValue = getRawPrecisionValue(coercedNumeric)
+          const numericFactory = NumericProvider.getGlobalFactory()
+          if (coercedType.maxValue !== undefined && numericValue.greaterThan(numericFactory.fromNumber(coercedType.maxValue))) {
+            return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
+          }
+          if (coercedType.minValue !== undefined && numericValue.lessThan(numericFactory.fromNumber(coercedType.minValue))) {
+            return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
+          }
+          if (coercedType.lessThan !== undefined && numericValue.greaterThanOrEqualTo(numericFactory.fromNumber(coercedType.lessThan))) {
+            return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
+          }
+          if (coercedType.greaterThan !== undefined && numericValue.lessThanOrEqualTo(numericFactory.fromNumber(coercedType.greaterThan))) {
+            return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
+          }
+          // Return Numeric directly for precise calculations
+          return numericValue
+        }
       }
     }
     if (coercedType.passSubtype || ret === undefined) {
       return ret
+    } else if (isExtendedNumber(ret)) {
+      // DEPRECATED: This conversion causes precision loss
+      // New plugins should use FunctionArgumentType.NUMERIC instead of NUMBER
+      // to receive Numeric directly and maintain high precision throughout calculations.
+      // This fallback exists only for backward compatibility with legacy plugins.
+      const rawValue = getRawPrecisionValue(ret)
+      return rawValue.toNumber()
     } else {
-      return getRawValue(ret)
+      return ret
     }
   }
 
@@ -423,6 +482,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return SimpleRangeValue.onlyValues(resultArray)
   }
 
+  
+  /**
+   *
+   */
   protected calculateSingleCellOfResultArray(
     state: InterpreterState,
     vectorizedArguments: Maybe<InterpreterValue>[],
@@ -441,6 +504,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return this.returnNumberWrapper(functionCalculationResult, returnNumberType) as RawInterpreterValue
   }
 
+  
+  /**
+   *
+   */
   protected coerceArgumentsToRequiredTypes(
     state: InterpreterState,
     vectorizedArguments: Maybe<InterpreterValue>[],
@@ -474,6 +541,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return coercedArguments
   }
 
+  
+  /**
+   *
+   */
   protected vectorizeAndBroadcastArgumentsIfNecessary(isVectorizationOn: boolean, argumentValues: InterpreterValue[], argumentMetadata: FunctionArgument[], row: number, col: number): Maybe<InterpreterValue>[] {
     return argumentValues.map((value, i) =>
       isVectorizationOn && this.isRangePassedAsAScalarArgument(value, argumentMetadata[i])
@@ -482,6 +553,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     )
   }
 
+  
+  /**
+   *
+   */
   protected vectorizeAndBroadcastRangeArgument(argumentValue: SimpleRangeValue, rowNum: number, colNum: number): Maybe<InterpreterValue> {
     const targetRowNum = argumentValue.height() === 1 ? 0 : rowNum
     const targetColNum = argumentValue.width() === 1 ? 0 : colNum
@@ -489,10 +564,18 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return argumentValue.data[targetRowNum]?.[targetColNum]
   }
 
+  
+  /**
+   *
+   */
   protected evaluateArguments(args: Ast[], state: InterpreterState, metadata: FunctionMetadata): [InterpreterValue, boolean][] {
     return metadata.expandRanges ? this.listOfScalarValues(args, state) : args.map((ast) => [this.evaluateAst(ast, state), false])
   }
 
+  
+  /**
+   *
+   */
   protected buildMetadataForEachArgumentValue(numberOfArgumentValuesPassed: number, metadata: FunctionMetadata): FunctionArgument[] {
     const argumentsMetadata: FunctionArgument[] = metadata.parameters ? [ ...metadata.parameters ] : []
     const isRepeatLastArgsValid = metadata.repeatLastArgs !== undefined && Number.isInteger(metadata.repeatLastArgs) && metadata.repeatLastArgs > 0
@@ -506,6 +589,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return argumentsMetadata
   }
 
+  
+  /**
+   *
+   */
   protected isNumberOfArgumentValuesValid(argumentsMetadata: FunctionArgument[], numberOfArgumentValuesPassed: number): boolean {
     if (numberOfArgumentValuesPassed > argumentsMetadata.length) {
       return false
@@ -520,6 +607,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return true
   }
 
+  
+  /**
+   *
+   */
   protected calculateSizeOfVectorizedResultArray(argumentValues: InterpreterValue[], argumentMetadata: FunctionArgument[]): [ number, number ] {
     const argumentsThatRequireVectorization = argumentValues
       .filter((value, i) => this.isRangePassedAsAScalarArgument(value, argumentMetadata[i])) as SimpleRangeValue[]
@@ -530,6 +621,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return [ height, width ]
   }
 
+  
+  /**
+   *
+   */
   protected isRangePassedAsAScalarArgument(argumentValue: Maybe<InterpreterValue>, argumentMetadata: Maybe<FunctionArgument>): argumentValue is SimpleRangeValue {
     if (argumentValue == null || argumentMetadata == null) {
       return false
@@ -577,6 +672,10 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     return this.runFunction(args, state, metadata, nonReferenceCallback)
   }
 
+  
+  /**
+   *
+   */
   protected metadata(name: string): FunctionMetadata {
     const params = (this.constructor as FunctionPluginDefinition).implementedFunctions[name]
     if (params !== undefined) {
@@ -585,9 +684,21 @@ export abstract class FunctionPlugin implements FunctionPluginTypecheck<Function
     throw new Error(`No metadata for function ${name}.`)
   }
 
-  protected returnNumberWrapper<T>(val: T | ExtendedNumber, type?: NumberType, format?: FormatInfo): T | ExtendedNumber {
+  
+  /**
+   *
+   */
+  protected returnNumberWrapper<T>(val: T | ExtendedNumber | number, type?: NumberType, format?: FormatInfo): T | ExtendedNumber {
+    // Convert native number to Numeric for precision
+    if (typeof val === 'number') {
+      const precisionVal = this.arithmeticHelper.createNumber(val)
+      if (type !== undefined) {
+        return this.arithmeticHelper.ExtendedNumberFactory(precisionVal, {type, format})
+      }
+      return precisionVal as unknown as T | ExtendedNumber
+    }
     if (type !== undefined && isExtendedNumber(val)) {
-      return this.arithmeticHelper.ExtendedNumberFactory(getRawValue(val), {type, format})
+      return this.arithmeticHelper.ExtendedNumberFactory(getRawPrecisionValue(val), {type, format})
     } else {
       return val
     }

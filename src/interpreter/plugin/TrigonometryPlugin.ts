@@ -10,6 +10,7 @@ import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
 import {PI} from './MathConstantsPlugin'
+import {Numeric} from '../../Numeric'
 
 /**
  * Interpreter plugin containing trigonometric functions
@@ -20,128 +21,128 @@ export class TrigonometryPlugin extends FunctionPlugin implements FunctionPlugin
     'ACOS': {
       method: 'acos',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ASIN': {
       method: 'asin',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'COS': {
       method: 'cos',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'SIN': {
       method: 'sin',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'TAN': {
       method: 'tan',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ATAN': {
       method: 'atan',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ATAN2': {
       method: 'atan2',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ]
     },
     'COT': {
       method: 'cot',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'SEC': {
       method: 'sec',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'CSC': {
       method: 'csc',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'SINH': {
       method: 'sinh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'COSH': {
       method: 'cosh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'TANH': {
       method: 'tanh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'COTH': {
       method: 'coth',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'SECH': {
       method: 'sech',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'CSCH': {
       method: 'csch',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ACOT': {
       method: 'acot',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ASINH': {
       method: 'asinh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ACOSH': {
       method: 'acosh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ATANH': {
       method: 'atanh',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'ACOTH': {
       method: 'acoth',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
   }
@@ -155,109 +156,215 @@ export class TrigonometryPlugin extends FunctionPlugin implements FunctionPlugin
    * @param state
    */
   public acos(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ACOS'), Math.acos)
+    return this.runFunction(ast.args, state, this.metadata('ACOS'), 
+      (arg: Numeric) => arg.acos()
+    )
   }
 
+  
+  /**
+   *
+   */
   public asin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ASIN'), Math.asin)
+    return this.runFunction(ast.args, state, this.metadata('ASIN'), 
+      (arg: Numeric) => arg.asin()
+    )
   }
 
+  
+  /**
+   *
+   */
   public cos(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('COS'), Math.cos)
+    return this.runFunction(ast.args, state, this.metadata('COS'), 
+      (arg: Numeric) => arg.cos()
+    )
   }
 
+  
+  /**
+   *
+   */
   public sin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('SIN'), Math.sin)
+    return this.runFunction(ast.args, state, this.metadata('SIN'), 
+      (arg: Numeric) => arg.sin()
+    )
   }
 
+  
+  /**
+   *
+   */
   public tan(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('TAN'), Math.tan)
+    return this.runFunction(ast.args, state, this.metadata('TAN'), 
+      (arg: Numeric) => arg.tan()
+    )
   }
 
+  
+  /**
+   *
+   */
   public atan(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ATAN'), Math.atan)
+    return this.runFunction(ast.args, state, this.metadata('ATAN'), 
+      (arg: Numeric) => arg.atan()
+    )
   }
 
+  
+  /**
+   *
+   */
   public atan2(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ATAN2'),
-      (x: number, y: number) => {
-        if (x === 0 && y === 0) {
+      (x: Numeric, y: Numeric) => {
+        if (x.isZero() && y.isZero()) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return Math.atan2(y, x)
+        return y.atan2(x)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public cot(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('COT'),
-      (arg) => (arg === 0) ? new CellError(ErrorType.DIV_BY_ZERO) : (1 / Math.tan(arg))
+      (arg: Numeric) => arg.isZero() ? new CellError(ErrorType.DIV_BY_ZERO) : arg.tan().pow(-1)
     )
   }
 
+  
+  /**
+   *
+   */
   public acot(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ACOT'),
-      (arg) => (arg === 0) ? PI / 2 : Math.atan(1 / arg)
+      (arg: Numeric) => arg.isZero() ? PI / 2 : arg.pow(-1).atan()
     )
   }
 
+  
+  /**
+   *
+   */
   public sec(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SEC'),
-      (arg: number) => 1 / Math.cos(arg)
+      // Using native Math.cos for better precision near π/2 where cos approaches 0
+      // The reciprocal calculation near zero requires maximum native precision
+      (arg: Numeric) => 1 / Math.cos(arg.toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public csc(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CSC'),
-      (arg) => (arg === 0) ? new CellError(ErrorType.DIV_BY_ZERO) : (1 / Math.sin(arg))
+      (arg: Numeric) => arg.isZero() ? new CellError(ErrorType.DIV_BY_ZERO) : arg.sin().pow(-1)
     )
   }
 
+  
+  /**
+   *
+   */
   public sinh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('SINH'), Math.sinh)
+    return this.runFunction(ast.args, state, this.metadata('SINH'), 
+      (arg: Numeric) => arg.sinh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public asinh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ASINH'), Math.asinh)
+    return this.runFunction(ast.args, state, this.metadata('ASINH'), 
+      (arg: Numeric) => arg.asinh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public cosh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('COSH'), Math.cosh)
+    return this.runFunction(ast.args, state, this.metadata('COSH'), 
+      (arg: Numeric) => arg.cosh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public acosh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ACOSH'), Math.acosh)
+    return this.runFunction(ast.args, state, this.metadata('ACOSH'), 
+      (arg: Numeric) => arg.acosh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public tanh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('TANH'), Math.tanh)
+    return this.runFunction(ast.args, state, this.metadata('TANH'), 
+      (arg: Numeric) => arg.tanh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public atanh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ATANH'), Math.atanh)
+    return this.runFunction(ast.args, state, this.metadata('ATANH'), 
+      (arg: Numeric) => arg.atanh()
+    )
   }
 
+  
+  /**
+   *
+   */
   public coth(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('COTH'),
-      (arg) => (arg === 0) ? new CellError(ErrorType.DIV_BY_ZERO) : (1 / Math.tanh(arg))
+      (arg: Numeric) => arg.isZero() ? new CellError(ErrorType.DIV_BY_ZERO) : arg.tanh().pow(-1)
     )
   }
 
+  
+  /**
+   *
+   */
   public acoth(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ACOTH'),
-      (arg) => (arg === 0) ? new CellError(ErrorType.NUM, ErrorMessage.NonZero) : Math.atanh(1 / arg)
+      (arg: Numeric) => arg.isZero() ? new CellError(ErrorType.NUM, ErrorMessage.NonZero) : arg.pow(-1).atanh()
     )
   }
 
+  
+  /**
+   *
+   */
   public sech(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SECH'),
-      (arg: number) => 1 / Math.cosh(arg)
+      (arg: Numeric) => arg.cosh().pow(-1)
     )
   }
 
+  
+  /**
+   *
+   */
   public csch(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CSCH'),
-      (arg) => (arg === 0) ? new CellError(ErrorType.DIV_BY_ZERO) : (1 / Math.sinh(arg))
+      (arg: Numeric) => arg.isZero() ? new CellError(ErrorType.DIV_BY_ZERO) : arg.sinh().pow(-1)
     )
   }
 }

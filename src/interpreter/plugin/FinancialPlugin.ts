@@ -9,240 +9,244 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {
   EmptyValue,
-  getRawValue,
+  getRawPrecisionValue,
   InterpreterValue,
   isExtendedNumber,
   NumberType,
-  RawInterpreterValue
+  RawInterpreterValue,
 } from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric, NumericProvider, npvNumeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class FinancialPlugin extends FunctionPlugin implements FunctionPluginTypecheck<FinancialPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'PMT': {
       method: 'pmt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},  // rate - high precision
+        {argumentType: FunctionArgumentType.NUMERIC},  // periods - high precision
+        {argumentType: FunctionArgumentType.NUMERIC},  // present value - high precision
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},  // future value
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},  // type (0 or 1)
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'IPMT': {
       method: 'ipmt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'PPMT': {
       method: 'ppmt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'FV': {
       method: 'fv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},  // rate - high precision
+        {argumentType: FunctionArgumentType.NUMERIC},  // periods - high precision
+        {argumentType: FunctionArgumentType.NUMERIC},  // payment - high precision
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},  // present value
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},  // type (0 or 1)
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'CUMIPMT': {
       method: 'cumipmt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 1},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 1},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'CUMPRINC': {
       method: 'cumprinc',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 1},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 1},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'DB': {
       method: 'db',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 1, maxValue: 12, defaultValue: 12},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1, maxValue: 12, defaultValue: 12},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'DDB': {
       method: 'ddb',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.INTEGER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, defaultValue: 2},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, defaultValue: 2},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'DOLLARDE': {
       method: 'dollarde',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ],
     },
     'DOLLARFR': {
       method: 'dollarfr',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ],
     },
     'EFFECT': {
       method: 'effect',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'ISPMT': {
       method: 'ispmt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
     },
     'NOMINAL': {
       method: 'nominal',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'NPER': {
       method: 'nper',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
       ],
     },
     'PV': {
       method: 'pv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'RATE': {
       method: 'rate',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0.1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0.1},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'RRI': {
       method: 'rri',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'SLN': {
       method: 'sln',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'SYD': {
       method: 'syd',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'TBILLEQ': {
       method: 'tbilleq',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'TBILLPRICE': {
       method: 'tbillprice',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
     },
     'TBILLYIELD': {
       method: 'tbillyield',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'FVSCHEDULE': {
       method: 'fvschedule',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision value
         {argumentType: FunctionArgumentType.RANGE},
       ],
       returnNumberType: NumberType.NUMBER_CURRENCY
@@ -250,7 +254,7 @@ export class FinancialPlugin extends FunctionPlugin implements FunctionPluginTyp
     'NPV': {
       method: 'npv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision rate
         {argumentType: FunctionArgumentType.ANY},
       ],
       repeatLastArgs: 1,
@@ -260,491 +264,789 @@ export class FinancialPlugin extends FunctionPlugin implements FunctionPluginTyp
       method: 'mirr',
       parameters: [
         {argumentType: FunctionArgumentType.RANGE},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision finance rate
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision reinvest rate
       ],
       returnNumberType: NumberType.NUMBER_PERCENT
     },
     'PDURATION': {
       method: 'pduration',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
     },
     'XNPV': {
       method: 'xnpv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: -1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: -1},  // High precision rate
         {argumentType: FunctionArgumentType.RANGE},
         {argumentType: FunctionArgumentType.RANGE},
       ],
     },
   }
 
+  
+  /**
+   * PMT function - calculates payment for a loan based on constant payments and interest rate.
+   */
   public pmt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('PMT'), pmtCore)
+    return this.runFunction(ast.args, state, this.metadata('PMT'),
+      (rate: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric) => {
+        return pmtNumeric(rate, periods, present, future, type)
+      }
+    )
   }
 
+  
+  /**
+   *
+   */
   public ipmt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('IPMT'), ipmtCore)
+    return this.runFunction(ast.args, state, this.metadata('IPMT'), 
+      (rate: Numeric, period: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric) => {
+        return ipmtNumeric(rate, period, periods, present, future, type)
+      }
+    )
   }
 
+  
+  /**
+   *
+   */
   public ppmt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('PPMT'), ppmtCore)
+    return this.runFunction(ast.args, state, this.metadata('PPMT'), 
+      (rate: Numeric, period: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric) => {
+        return ppmtNumeric(rate, period, periods, present, future, type)
+      }
+    )
   }
 
+  
+  /**
+   * FV function - calculates future value of an investment.
+   */
   public fv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('FV'), fvCore)
+    return this.runFunction(ast.args, state, this.metadata('FV'),
+      (rate: Numeric, periods: Numeric, payment: Numeric, value: Numeric, type: Numeric) => {
+        return fvNumeric(rate, periods, payment, value, type)
+      }
+    )
   }
 
+  
+  /**
+   *
+   */
   public cumipmt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CUMIPMT'),
-      (rate: number, periods: number, value: number, start: number, end: number, type: number) => {
-        if (start > end) {
+      (rate: Numeric, periods: Numeric, value: Numeric, startArg: Numeric, endArg: Numeric, type: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const start = startArg.trunc()
+        const end = endArg.trunc()
+        if (start.greaterThan(end)) {
           return new CellError(ErrorType.NUM, ErrorMessage.EndStartPeriod)
         }
-        let acc = 0
-        for (let i = start; i <= end; i++) {
-          acc += ipmtCore(rate, i, periods, value, 0, type)
+        let acc = factory.zero()
+        const one = factory.one()
+        const zeroNumeric = factory.zero()
+        let i = start
+        while (i.lessThanOrEqualTo(end)) {
+          acc = acc.plus(ipmtNumeric(rate, i, periods, value, zeroNumeric, type))
+          i = i.plus(one)
         }
         return acc
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public cumprinc(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CUMPRINC'),
-      (rate: number, periods: number, value: number, start: number, end: number, type: number) => {
-        if (start > end) {
+      (rate: Numeric, periods: Numeric, value: Numeric, startArg: Numeric, endArg: Numeric, type: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const start = startArg.trunc()
+        const end = endArg.trunc()
+        if (start.greaterThan(end)) {
           return new CellError(ErrorType.NUM, ErrorMessage.EndStartPeriod)
         }
-        let acc = 0
-        for (let i = start; i <= end; i++) {
-          acc += ppmtCore(rate, i, periods, value, 0, type)
+        let acc = factory.zero()
+        const one = factory.one()
+        const zeroNumeric = factory.zero()
+        let i = start
+        while (i.lessThanOrEqualTo(end)) {
+          acc = acc.plus(ppmtNumeric(rate, i, periods, value, zeroNumeric, type))
+          i = i.plus(one)
         }
         return acc
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public db(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DB'),
-      (cost: number, salvage: number, life: number, period: number, month: number) => {
-        if ((month === 12 && period > life) || (period > life + 1)) {
+      (cost: Numeric, salvage: Numeric, life: Numeric, period: Numeric, month: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const twelve = factory.fromNumber(12)
+        const thousand = factory.fromNumber(1000)
+        
+        // if ((month === 12 && period > life) || (period > life + 1))
+        if ((month.equals(twelve) && period.greaterThan(life)) || period.greaterThan(life.plus(one))) {
           return new CellError(ErrorType.NUM, ErrorMessage.PeriodLong)
         }
 
-        if (salvage >= cost) {
-          return 0
+        if (salvage.greaterThanOrEqualTo(cost)) {
+          return factory.zero()
         }
 
-        const rate = Math.round((1 - Math.pow(salvage / cost, 1 / life)) * 1000) / 1000
+        // rate = round((1 - (salvage / cost) ^ (1 / life)) * 1000) / 1000
+        const rate = one.minus(salvage.dividedBy(cost).pow(one.dividedBy(life))).times(thousand).round().dividedBy(thousand)
 
-        const initial = cost * rate * month / 12
+        // initial = cost * rate * month / 12
+        const initial = cost.times(rate).times(month).dividedBy(twelve)
 
-        if (period === 1) {
+        if (period.equals(one)) {
           return initial
         }
 
         let total = initial
 
-        for (let i = 0; i < period - 2; i++) {
-          total += (cost - total) * rate
+        // for (let i = 0; i < period - 2; i++)
+        const periodMinusTwo = period.minus(factory.fromNumber(2))
+        let i = factory.zero()
+        while (i.lessThan(periodMinusTwo)) {
+          total = total.plus(cost.minus(total).times(rate))
+          i = i.plus(one)
         }
-        if (period === life + 1) {
-          return (cost - total) * rate * (12 - month) / 12
+        
+        if (period.equals(life.plus(one))) {
+          // (cost - total) * rate * (12 - month) / 12
+          return cost.minus(total).times(rate).times(twelve.minus(month)).dividedBy(twelve)
         }
-        return (cost - total) * rate
+        return cost.minus(total).times(rate)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public ddb(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DDB'),
-      (cost: number, salvage: number, life: number, period: number, factor: number) => {
-        if (period > life) {
+      (cost: Numeric, salvage: Numeric, life: Numeric, period: Numeric, factor: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const zero = factory.zero()
+        
+        if (period.greaterThan(life)) {
           return new CellError(ErrorType.NUM)
         }
-        let rate = factor / life
-        let oldValue
-        if (rate >= 1) {
-          rate = 1
-          if (period === 1) {
+        
+        let rate = factor.dividedBy(life)
+        let oldValue: Numeric
+        
+        if (rate.greaterThanOrEqualTo(one)) {
+          rate = one
+          if (period.equals(one)) {
             oldValue = cost
           } else {
-            oldValue = 0
+            oldValue = zero
           }
         } else {
-          oldValue = cost * Math.pow(1 - rate, period - 1)
+          // oldValue = cost * (1 - rate) ^ (period - 1)
+          oldValue = cost.times(one.minus(rate).pow(period.minus(one)))
         }
-        const newValue = cost * Math.pow(1 - rate, period)
-        return Math.max(oldValue - Math.max(salvage, newValue), 0)
+        
+        // newValue = cost * (1 - rate) ^ period
+        const newValue = cost.times(one.minus(rate).pow(period))
+        
+        // Math.max(oldValue - Math.max(salvage, newValue), 0)
+        const innerMax = salvage.greaterThan(newValue) ? salvage : newValue
+        const result = oldValue.minus(innerMax)
+        return result.greaterThan(zero) ? result : zero
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public dollarde(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DOLLARDE'),
-      (dollar: number, fraction: number) => {
-        if (fraction < 1) {
+      (dollar: Numeric, fractionArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const ten = factory.fromNumber(10)
+        
+        if (fractionArg.lessThan(one)) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        fraction = Math.trunc(fraction)
-
-        while (fraction > 10) {
-          fraction /= 10
+        
+        let fraction = fractionArg.trunc()
+        while (fraction.greaterThan(ten)) {
+          fraction = fraction.dividedBy(ten)
         }
-        return Math.trunc(dollar) + (dollar - Math.trunc(dollar)) * 10 / fraction
+        
+        // Math.trunc(dollar) + (dollar - Math.trunc(dollar)) * 10 / fraction
+        const dollarTrunc = dollar.trunc()
+        return dollarTrunc.plus(dollar.minus(dollarTrunc).times(ten).dividedBy(fraction))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public dollarfr(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DOLLARFR'),
-      (dollar: number, fraction: number) => {
-        if (fraction < 1) {
+      (dollar: Numeric, fractionArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const ten = factory.fromNumber(10)
+        
+        if (fractionArg.lessThan(one)) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        fraction = Math.trunc(fraction)
-
-        while (fraction > 10) {
-          fraction /= 10
+        
+        let fraction = fractionArg.trunc()
+        while (fraction.greaterThan(ten)) {
+          fraction = fraction.dividedBy(ten)
         }
-        return Math.trunc(dollar) + (dollar - Math.trunc(dollar)) * fraction / 10
+        
+        // Math.trunc(dollar) + (dollar - Math.trunc(dollar)) * fraction / 10
+        const dollarTrunc = dollar.trunc()
+        return dollarTrunc.plus(dollar.minus(dollarTrunc).times(fraction).dividedBy(ten))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public effect(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('EFFECT'),
-      (rate: number, periods: number) => {
-        periods = Math.trunc(periods)
-        return Math.pow(1 + rate / periods, periods) - 1
+      (rate: Numeric, periodsArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const periods = periodsArg.trunc()
+        // (1 + rate / periods) ^ periods - 1
+        return one.plus(rate.dividedBy(periods)).pow(periods).minus(one)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public ispmt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('ISPMT'),
-      (rate, period, periods, value) => {
-        if (periods === 0) {
+      (rate: Numeric, period: Numeric, periods: Numeric, value: Numeric) => {
+        if (periods.isZero()) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return value * rate * (period / periods - 1)
+        // value * rate * (period / periods - 1)
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        return value.times(rate).times(period.dividedBy(periods).minus(one))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public nominal(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NOMINAL'),
-      (rate: number, periods: number) => {
-        periods = Math.trunc(periods)
-        return (Math.pow(rate + 1, 1 / periods) - 1) * periods
+      (rate: Numeric, periodsArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const periods = periodsArg.trunc()
+        // ((rate + 1) ^ (1 / periods) - 1) * periods
+        return rate.plus(one).pow(one.dividedBy(periods)).minus(one).times(periods)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public nper(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NPER'),
-      (rate: number, payment: number, present: number, future: number, type: number) => {
-        if (rate === 0) {
-          if (payment === 0) {
+      (rate: Numeric, paymentArg: Numeric, present: Numeric, future: Numeric, typeArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const one = factory.one()
+        
+        if (rate.isZero()) {
+          if (paymentArg.isZero()) {
             return new CellError(ErrorType.DIV_BY_ZERO)
           }
-          return (-present - future) / payment
+          // (-present - future) / payment
+          return present.neg().minus(future).dividedBy(paymentArg)
         }
-        if (type) {
-          payment *= 1 + rate
+        
+        let payment = paymentArg
+        if (!typeArg.isZero()) {
+          payment = payment.times(one.plus(rate))
         }
-        return Math.log((payment - future * rate) / (present * rate + payment)) / Math.log(1 + rate)
+        
+        // log((payment - future * rate) / (present * rate + payment)) / log(1 + rate)
+        const numerator = payment.minus(future.times(rate))
+        const denominator = present.times(rate).plus(payment)
+        return numerator.dividedBy(denominator).ln().dividedBy(one.plus(rate).ln())
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public rate(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     // Newton's method: https://en.wikipedia.org/wiki/Newton%27s_method
     return this.runFunction(ast.args, state, this.metadata('RATE'),
-      (periods: number, payment: number, present: number, future: number, type: number, guess: number) => {
-        if (guess <= -1) {
+      (periods: Numeric, payment: Numeric, present: Numeric, future: Numeric, typeArg: Numeric, guess: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const one = factory.one()
+        const minusOne = factory.fromNumber(-1)
+        
+        const type = typeArg.isZero() ? zero : one
+        
+        if (guess.lessThanOrEqualTo(minusOne)) {
           return new CellError(ErrorType.VALUE)
         }
 
-        const epsMax = 1e-7
-
+        const epsMax = factory.fromNumber(1e-7)
         const iterMax = 50
 
         let rate = guess
-        type = type ? 1 : 0
-        for (let i = 0; i < iterMax; i++) {
-          if (rate <= -1) {
+        for (let iter = 0; iter < iterMax; iter++) {
+          if (rate.lessThanOrEqualTo(minusOne)) {
             return new CellError(ErrorType.NUM)
           }
-          let y
-          if (Math.abs(rate) < epsMax) {
-            y = present * (1 + periods * rate) + payment * (1 + rate * type) * periods + future
+          let y: Numeric
+          if (rate.abs().lessThan(epsMax)) {
+            // y = present * (1 + periods * rate) + payment * (1 + rate * type) * periods + future
+            y = present.times(one.plus(periods.times(rate)))
+              .plus(payment.times(one.plus(rate.times(type))).times(periods))
+              .plus(future)
           } else {
-            const f = Math.pow(1 + rate, periods)
-            y = present * f + payment * (1 / rate + type) * (f - 1) + future
+            // f = (1 + rate) ^ periods
+            const f = one.plus(rate).pow(periods)
+            // y = present * f + payment * (1 / rate + type) * (f - 1) + future
+            y = present.times(f)
+              .plus(payment.times(one.dividedBy(rate).plus(type)).times(f.minus(one)))
+              .plus(future)
           }
-          if (Math.abs(y) < epsMax) {
+          if (y.abs().lessThan(epsMax)) {
             return rate
           }
-          let dy
-          if (Math.abs(rate) < epsMax) {
-            dy = present * periods + payment * type * periods
+          let dy: Numeric
+          if (rate.abs().lessThan(epsMax)) {
+            // dy = present * periods + payment * type * periods
+            dy = present.times(periods).plus(payment.times(type).times(periods))
           } else {
-            const f = Math.pow(1 + rate, periods)
-            const df = periods * Math.pow(1 + rate, periods - 1)
-            dy = present * df + payment * (1 / rate + type) * df + payment * (-1 / (rate * rate)) * (f - 1)
+            // f = (1 + rate) ^ periods
+            const f = one.plus(rate).pow(periods)
+            // df = periods * (1 + rate) ^ (periods - 1)
+            const df = periods.times(one.plus(rate).pow(periods.minus(one)))
+            // dy = present * df + payment * (1 / rate + type) * df + payment * (-1 / rate^2) * (f - 1)
+            dy = present.times(df)
+              .plus(payment.times(one.dividedBy(rate).plus(type)).times(df))
+              .plus(payment.times(minusOne.dividedBy(rate.times(rate))).times(f.minus(one)))
           }
-          rate -= y / dy
+          rate = rate.minus(y.dividedBy(dy))
         }
         return new CellError(ErrorType.NUM)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public pv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('PV'),
-      (rate: number, periods: number, payment: number, future: number, type: number) => {
-        type = type ? 1 : 0
-        if (rate === -1) {
-          if (periods === 0) {
+      (rate: Numeric, periods: Numeric, payment: Numeric, future: Numeric, typeArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const one = factory.one()
+        const minusOne = factory.fromNumber(-1)
+        const type = typeArg.isZero() ? zero : one
+        
+        if (rate.equals(minusOne)) {
+          if (periods.isZero()) {
             return new CellError(ErrorType.NUM)
           } else {
             return new CellError(ErrorType.DIV_BY_ZERO)
           }
         }
-        if (rate === 0) {
-          return -payment * periods - future
+        if (rate.isZero()) {
+          // -payment * periods - future
+          return payment.neg().times(periods).minus(future)
         } else {
-          return ((1 - Math.pow(1 + rate, periods)) * payment * (1 + rate * type) / rate - future) / Math.pow(1 + rate, periods)
+          // ((1 - (1 + rate)^periods) * payment * (1 + rate * type) / rate - future) / (1 + rate)^periods
+          const onePlusRatePow = one.plus(rate).pow(periods)
+          const numerator = one.minus(onePlusRatePow).times(payment).times(one.plus(rate.times(type))).dividedBy(rate).minus(future)
+          return numerator.dividedBy(onePlusRatePow)
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public rri(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('RRI'),
-      (periods, present, future) => {
-        if (present === 0 || (future < 0 && present > 0) || (future > 0 && present < 0)) {
+      (periods: Numeric, present: Numeric, future: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const one = factory.one()
+        
+        if (present.isZero() || (future.isNegative() && present.isPositive()) || (future.isPositive() && present.isNegative())) {
           return new CellError(ErrorType.NUM)
         }
 
-        return Math.pow(future / present, 1 / periods) - 1
+        // (future / present) ^ (1 / periods) - 1
+        return future.dividedBy(present).pow(one.dividedBy(periods)).minus(one)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public sln(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SLN'),
-      (cost, salvage, life) => {
-        if (life === 0) {
+      (cost: Numeric, salvage: Numeric, life: Numeric) => {
+        if (life.isZero()) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return (cost - salvage) / life
+        // (cost - salvage) / life
+        return cost.minus(salvage).dividedBy(life)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public syd(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SYD'),
-      (cost: number, salvage: number, life: number, period: number) => {
-        if (period > life) {
+      (cost: Numeric, salvage: Numeric, life: Numeric, period: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        const two = factory.fromNumber(2)
+        
+        if (period.greaterThan(life)) {
           return new CellError(ErrorType.NUM)
         }
-        return ((cost - salvage) * (life - period + 1) * 2) / (life * (life + 1))
+        // ((cost - salvage) * (life - period + 1) * 2) / (life * (life + 1))
+        return cost.minus(salvage).times(life.minus(period).plus(one)).times(two)
+          .dividedBy(life.times(life.plus(one)))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public tbilleq(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('TBILLEQ'),
-      (settlement: number, maturity: number, discount: number) => {
-        settlement = Math.round(settlement)
-        maturity = Math.round(maturity)
-        if (settlement >= maturity) {
+      (settlementArg: Numeric, maturityArg: Numeric, discount: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const settlement = settlementArg.round()
+        const maturity = maturityArg.round()
+        const three60 = factory.fromNumber(360)
+        const three65 = factory.fromNumber(365)
+        
+        if (settlement.greaterThanOrEqualTo(maturity)) {
           return new CellError(ErrorType.NUM)
         }
 
-        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement)
-        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity)
+        // Safe: date serial numbers for DateTimeHelper - dates are integers or have time fraction
+        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement.toNumber())
+        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity.toNumber())
         if (endDate.year > startDate.year + 1 || (endDate.year === startDate.year + 1 && (endDate.month > startDate.month || (endDate.month === startDate.month && endDate.day > startDate.day)))) {
           return new CellError(ErrorType.NUM)
         }
-        const denom = 360 - discount * (maturity - settlement)
-        if (denom === 0) {
-          return 0
+        
+        // denom = 360 - discount * (maturity - settlement)
+        const diff = maturity.minus(settlement)
+        const denom = three60.minus(discount.times(diff))
+        
+        if (denom.isZero()) {
+          return zero
         }
-        if (denom < 0) {
+        if (denom.isNegative()) {
           return new CellError(ErrorType.NUM)
         }
-        return 365 * discount / denom
+        // 365 * discount / denom
+        return three65.times(discount).dividedBy(denom)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public tbillprice(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('TBILLPRICE'),
-      (settlement: number, maturity: number, discount: number) => {
-        settlement = Math.round(settlement)
-        maturity = Math.round(maturity)
-        if (settlement >= maturity) {
+      (settlementArg: Numeric, maturityArg: Numeric, discount: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const settlement = settlementArg.round()
+        const maturity = maturityArg.round()
+        const three60 = factory.fromNumber(360)
+        const hundred = factory.fromNumber(100)
+        
+        if (settlement.greaterThanOrEqualTo(maturity)) {
           return new CellError(ErrorType.NUM)
         }
 
-        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement)
-        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity)
+        // Safe: date serial numbers for DateTimeHelper - dates are integers or have time fraction
+        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement.toNumber())
+        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity.toNumber())
         if (endDate.year > startDate.year + 1 || (endDate.year === startDate.year + 1 && (endDate.month > startDate.month || (endDate.month === startDate.month && endDate.day > startDate.day)))) {
           return new CellError(ErrorType.NUM)
         }
-        const denom = 360 - discount * (maturity - settlement)
-        if (denom === 0) {
-          return 0
+        
+        const diff = maturity.minus(settlement)
+        const denom = three60.minus(discount.times(diff))
+        
+        if (denom.isZero()) {
+          return zero
         }
-        if (denom < 0) {
+        if (denom.isNegative()) {
           return new CellError(ErrorType.NUM)
         }
-        return 100 * (1 - discount * (maturity - settlement) / 360)
+        // 100 * (1 - discount * (maturity - settlement) / 360)
+        const one = factory.one()
+        return hundred.times(one.minus(discount.times(diff).dividedBy(three60)))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public tbillyield(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('TBILLYIELD'),
-      (settlement: number, maturity: number, price: number) => {
-        settlement = Math.round(settlement)
-        maturity = Math.round(maturity)
-        if (settlement >= maturity) {
+      (settlementArg: Numeric, maturityArg: Numeric, price: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const settlement = settlementArg.round()
+        const maturity = maturityArg.round()
+        const hundred = factory.fromNumber(100)
+        const three60 = factory.fromNumber(360)
+        
+        if (settlement.greaterThanOrEqualTo(maturity)) {
           return new CellError(ErrorType.NUM)
         }
 
-        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement)
-        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity)
+        // Safe: date serial numbers for DateTimeHelper - dates are integers or have time fraction
+        const startDate = this.dateTimeHelper.numberToSimpleDate(settlement.toNumber())
+        const endDate = this.dateTimeHelper.numberToSimpleDate(maturity.toNumber())
         if (endDate.year > startDate.year + 1 || (endDate.year === startDate.year + 1 && (endDate.month > startDate.month || (endDate.month === startDate.month && endDate.day > startDate.day)))) {
           return new CellError(ErrorType.NUM)
         }
-        return (100 - price) * 360 / (price * (maturity - settlement))
+        
+        const diff = maturity.minus(settlement)
+        // (100 - price) * 360 / (price * (maturity - settlement))
+        return hundred.minus(price).times(three60).dividedBy(price.times(diff))
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public fvschedule(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('FVSCHEDULE'),
-      (value: number, ratios: SimpleRangeValue) => {
+      (value: Numeric, ratios: SimpleRangeValue) => {
+        const factory = NumericProvider.getGlobalFactory()
         const vals = ratios.valuesFromTopLeftCorner()
         for (const val of vals) {
           if (val instanceof CellError) {
             return val
           }
         }
+        let result = value
+        const one = factory.one()
         for (const val of vals) {
           if (isExtendedNumber(val)) {
-            value *= 1 + getRawValue(val)
+            const ratio = getRawPrecisionValue(val)
+            result = result.times(one.plus(ratio))
           } else if (val !== EmptyValue) {
             return new CellError(ErrorType.VALUE, ErrorMessage.NumberExpected)
           }
         }
-        return value
+        return result
       })
   }
 
+  
+  /**
+   *
+   */
   public npv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NPV'),
-      (rate: number, ...args: RawInterpreterValue[]) => {
-        const coerced = this.arithmeticHelper.coerceNumbersExactRanges(args)
-        if (coerced instanceof CellError) {
-          return coerced
+      (rate: Numeric, ...args: RawInterpreterValue[]) => {
+        const coercedPrecision = this.arithmeticHelper.coerceNumbersExactRanges(args)
+        if (coercedPrecision instanceof CellError) {
+          return coercedPrecision
         }
-        return npvCore(rate, coerced)
+        const result = npvNumeric(rate, coercedPrecision)
+        if (result === null) {
+          return new CellError(ErrorType.DIV_BY_ZERO)
+        }
+        return result
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public mirr(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('MIRR'),
-      (range: SimpleRangeValue, frate: number, rrate: number) => {
-        const vals = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
-        if (vals instanceof CellError) {
-          return vals
+      (range: SimpleRangeValue, frate: Numeric, rrate: Numeric) => {
+        const valsPrecision = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
+        if (valsPrecision instanceof CellError) {
+          return valsPrecision
         }
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        const one = factory.one()
         let posFlag = false
         let negFlag = false
-        const posValues: number[] = []
-        const negValues: number[] = []
-        for (const val of vals) {
-          if (val > 0) {
+        const posValues: Numeric[] = []
+        const negValues: Numeric[] = []
+        for (const val of valsPrecision) {
+          if (val.greaterThan(zero)) {
             posFlag = true
             posValues.push(val)
-            negValues.push(0)
-          } else if (val < 0) {
+            negValues.push(zero)
+          } else if (val.lessThan(zero)) {
             negFlag = true
             negValues.push(val)
-            posValues.push(0)
+            posValues.push(zero)
           } else {
-            negValues.push(0)
-            posValues.push(0)
+            negValues.push(zero)
+            posValues.push(zero)
           }
         }
         if (!posFlag || !negFlag) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        const n = vals.length
-        const nom = npvCore(rrate, posValues)
-        if (nom instanceof CellError) {
-          return nom
+        const n = valsPrecision.length
+        const nom = npvNumeric(rrate, posValues)
+        if (nom === null) {
+          return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        const denom = npvCore(frate, negValues)
-        if (denom instanceof CellError) {
-          return denom
+        const denom = npvNumeric(frate, negValues)
+        if (denom === null) {
+          return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return Math.pow(
-          (-nom * Math.pow(1 + rrate, n) / denom / (1 + frate)),
-          1 / (n - 1)
-        ) - 1
+        const onePlusRrate = one.plus(rrate)
+        const onePlusFrate = one.plus(frate)
+        // (-nom * (1 + rrate)^n / denom / (1 + frate))^(1/(n-1)) - 1
+        const numerator = nom.neg().times(onePlusRrate.pow(n))
+        const denominator = denom.times(onePlusFrate)
+        const base = numerator.dividedBy(denominator)
+        const exponent = factory.fromNumber(1 / (n - 1))
+        return base.pow(exponent).minus(one)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public pduration(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('PDURATION'),
-      (rate: number, pv: number, fv: number) => (Math.log(fv) - Math.log(pv)) / Math.log(1 + rate)
+      (rate: Numeric, pv: Numeric, fv: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const one = factory.one()
+        // (ln(fv) - ln(pv)) / ln(1 + rate)
+        return fv.ln().minus(pv.ln()).dividedBy(one.plus(rate).ln())
+      }
     )
   }
 
+  
+  /**
+   *
+   */
   public xnpv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('XNPV'),
-      (rate: number, values: SimpleRangeValue, dates: SimpleRangeValue) => {
+      (rate: Numeric, values: SimpleRangeValue, dates: SimpleRangeValue) => {
+        const factory = NumericProvider.getGlobalFactory()
         const valArr = values.valuesFromTopLeftCorner()
+        const valArrNumeric: Numeric[] = []
         for (const val of valArr) {
-          if (typeof val !== 'number') {
+          if (!isExtendedNumber(val)) {
             return new CellError(ErrorType.VALUE, ErrorMessage.NumberExpected)
           }
+          valArrNumeric.push(getRawPrecisionValue(val))
         }
-        const valArrNum = valArr as number[]
         const dateArr = dates.valuesFromTopLeftCorner()
+        const dateArrNumeric: Numeric[] = []
         for (const date of dateArr) {
-          if (typeof date !== 'number') {
+          if (!isExtendedNumber(date)) {
             return new CellError(ErrorType.VALUE, ErrorMessage.NumberExpected)
           }
+          dateArrNumeric.push(getRawPrecisionValue(date).floor())
         }
-        const dateArrNum = dateArr as number[]
-        if (dateArrNum.length !== valArrNum.length) {
+        if (dateArrNumeric.length !== valArrNumeric.length) {
           return new CellError(ErrorType.NUM, ErrorMessage.EqualLength)
         }
-        const n = dateArrNum.length
-        let ret = 0
-        if (dateArrNum[0] < 0) {
+        const n = dateArrNumeric.length
+        const zero = factory.zero()
+        const one = factory.one()
+        if (dateArrNumeric[0].isNegative()) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
         }
+        const onePlusRate = one.plus(rate)
+        const daysInYear = factory.fromNumber(365)
+        const date0 = dateArrNumeric[0]
+        let ret = zero
         for (let i = 0; i < n; i++) {
-          dateArrNum[i] = Math.floor(dateArrNum[i])
-          if (dateArrNum[i] < dateArrNum[0]) {
+          if (dateArrNumeric[i].lessThan(date0)) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          ret += valArrNum[i] / Math.pow(1 + rate, (dateArrNum[i] - dateArrNum[0]) / 365)
+          const daysDiff = dateArrNumeric[i].minus(date0)
+          const exponent = daysDiff.dividedBy(daysInYear)
+          const divisor = onePlusRate.pow(exponent)
+          ret = ret.plus(valArrNumeric[i].dividedBy(divisor))
         }
         return ret
       }
@@ -752,49 +1054,77 @@ export class FinancialPlugin extends FunctionPlugin implements FunctionPluginTyp
   }
 }
 
-function pmtCore(rate: number, periods: number, present: number, future: number, type: number): number {
-  if (rate === 0) {
-    return (-present - future) / periods
+// ============ HIGH-PRECISION NUMERIC VERSIONS ============
+
+/**
+ * PMT calculation using Numeric for high precision.
+ */
+function pmtNumeric(rate: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric): Numeric {
+  const factory = NumericProvider.getGlobalFactory()
+  const zero = factory.zero()
+  const one = factory.one()
+  
+  if (rate.equals(zero)) {
+    // (-present - future) / periods
+    return present.neg().minus(future).dividedBy(periods)
   } else {
-    const term = Math.pow(1 + rate, periods)
-    return (future * rate + present * rate * term) * (type ? 1 / (1 + rate) : 1) / (1 - term)
+    // term = (1 + rate) ^ periods
+    const term = one.plus(rate).pow(periods)
+    // (future * rate + present * rate * term) * (type ? 1 / (1 + rate) : 1) / (1 - term)
+    const numerator = future.times(rate).plus(present.times(rate).times(term))
+    const typeMultiplier = type.equals(zero) ? one : one.dividedBy(one.plus(rate))
+    const denominator = one.minus(term)
+    return numerator.times(typeMultiplier).dividedBy(denominator)
   }
 }
 
-function ipmtCore(rate: number, period: number, periods: number, present: number, future: number, type: number): number {
-  const payment = pmtCore(rate, periods, present, future, type)
-  if (period === 1) {
-    return rate * (type ? 0 : -present)
+/**
+ * FV calculation using Numeric for high precision.
+ */
+function fvNumeric(rate: Numeric, periods: Numeric, payment: Numeric, value: Numeric, type: Numeric): Numeric {
+  const factory = NumericProvider.getGlobalFactory()
+  const zero = factory.zero()
+  const one = factory.one()
+  
+  if (rate.equals(zero)) {
+    // -value - payment * periods
+    return value.neg().minus(payment.times(periods))
   } else {
-    return rate * (type ? fvCore(rate, period - 2, payment, present, type) - payment : fvCore(rate, period - 1, payment, present, type))
+    // term = (1 + rate) ^ periods
+    const term = one.plus(rate).pow(periods)
+    // payment * (type ? (1 + rate) : 1) * (1 - term) / rate - value * term
+    const typeMultiplier = type.equals(zero) ? one : one.plus(rate)
+    return payment.times(typeMultiplier).times(one.minus(term)).dividedBy(rate).minus(value.times(term))
   }
 }
 
-function fvCore(rate: number, periods: number, payment: number, value: number, type: number): number {
-  if (rate === 0) {
-    return -value - payment * periods
+/**
+ * IPMT calculation using Numeric for high precision.
+ */
+function ipmtNumeric(rate: Numeric, period: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric): Numeric {
+  const factory = NumericProvider.getGlobalFactory()
+  const zero = factory.zero()
+  const one = factory.one()
+  const two = factory.fromNumber(2)
+  
+  const payment = pmtNumeric(rate, periods, present, future, type)
+  if (period.equals(one)) {
+    // rate * (type ? 0 : -present)
+    return rate.times(type.equals(zero) ? present.neg() : zero)
   } else {
-    const term = Math.pow(1 + rate, periods)
-    return payment * (type ? (1 + rate) : 1) * (1 - term) / rate - value * term
-  }
-}
-
-function ppmtCore(rate: number, period: number, periods: number, present: number, future: number, type: number): number {
-  return pmtCore(rate, periods, present, future, type) - ipmtCore(rate, period, periods, present, future, type)
-}
-
-function npvCore(rate: number, args: number[]): number | CellError {
-  let acc = 0
-  for (let i = args.length - 1; i >= 0; i--) {
-    acc += args[i]
-    if (rate === -1) {
-      if (acc === 0) {
-        continue
-      } else {
-        return new CellError(ErrorType.DIV_BY_ZERO)
-      }
+    if (type.equals(zero)) {
+      // rate * fv(rate, period - 1, payment, present, type)
+      return rate.times(fvNumeric(rate, period.minus(one), payment, present, type))
+    } else {
+      // rate * (fv(rate, period - 2, payment, present, type) - payment)
+      return rate.times(fvNumeric(rate, period.minus(two), payment, present, type).minus(payment))
     }
-    acc /= 1 + rate
   }
-  return acc
+}
+
+/**
+ * PPMT calculation using Numeric for high precision.
+ */
+function ppmtNumeric(rate: Numeric, period: Numeric, periods: Numeric, present: Numeric, future: Numeric, type: Numeric): Numeric {
+  return pmtNumeric(rate, periods, present, future, type).minus(ipmtNumeric(rate, period, periods, present, future, type))
 }

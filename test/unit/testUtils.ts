@@ -1,4 +1,5 @@
 import {CellValue, DetailedCellError, ErrorType, HyperFormula, RawCellContent, Sheet, SheetDimensions} from '../../src'
+import {isNumeric} from '../../src/Numeric'
 import {AbsoluteCellRange, AbsoluteColumnRange, AbsoluteRowRange} from '../../src/AbsoluteCellRange'
 import {CellError, SimpleCellAddress, simpleCellAddress} from '../../src/Cell'
 import {Config} from '../../src/Config'
@@ -98,8 +99,9 @@ export const expectToBeCloseForComplex = (engine: HyperFormula, cell: string, ex
   const coerce = (arg: CellValue): complex => engine.evaluator.interpreter.arithmeticHelper.coerceScalarToComplex(arg)
   const actualVal: complex = coerce(engine.getCellValue(adr(cell)))
   const expectedVal: complex = coerce(expected)
-  expect(expectedVal[0]).toBeCloseTo(actualVal[0], precision)
-  expect(expectedVal[1]).toBeCloseTo(actualVal[1], precision)
+  // Convert Numeric to number for comparison
+  expect(expectedVal[0].toNumber()).toBeCloseTo(actualVal[0].toNumber(), precision)
+  expect(expectedVal[1].toNumber()).toBeCloseTo(actualVal[1].toNumber(), precision)
 }
 
 export const verifyValues = (engine: HyperFormula) => {
@@ -145,16 +147,25 @@ const colNumber = (input: string): number => {
   }
 }
 
+/**
+ *
+ */
 export function detailedError(errorType: ErrorType, message?: string, config?: Config): DetailedCellError {
   config = new Config(config)
   const error = new CellError(errorType, message)
   return new DetailedCellError(error, config.translationPackage.getErrorTranslation(errorType))
 }
 
+/**
+ *
+ */
 export function noSpace(): DetailedCellError {
   return detailedError(ErrorType.SPILL, ErrorMessage.NoSpaceForArrayResult)
 }
 
+/**
+ *
+ */
 export function detailedErrorWithOrigin(errorType: ErrorType, address: string, message?: string, config?: Config): DetailedCellError {
   config = new Config(config)
   const error = new CellError(errorType, message)
@@ -166,6 +177,9 @@ export const expectEngineToBeTheSameAs = (actual: HyperFormula, expected: HyperF
   comparator.compare()
 }
 
+/**
+ *
+ */
 export function dateNumberToString(dateNumber: CellValue, config: Config): string | DetailedCellError {
   if (dateNumber instanceof DetailedCellError) {
     return dateNumber
@@ -175,6 +189,9 @@ export function dateNumberToString(dateNumber: CellValue, config: Config): strin
   return dateString ?? ''
 }
 
+/**
+ *
+ */
 export function timeNumberToString(timeNumber: CellValue, config: Config): string | DetailedCellError {
   if (timeNumber instanceof DetailedCellError) {
     return timeNumber
@@ -184,12 +201,18 @@ export function timeNumberToString(timeNumber: CellValue, config: Config): strin
   return timeString ?? ''
 }
 
+/**
+ *
+ */
 export function unregisterAllLanguages() {
   for (const langCode of HyperFormula.getRegisteredLanguagesCodes()) {
     HyperFormula.unregisterLanguage(langCode)
   }
 }
 
+/**
+ *
+ */
 export function expectVerticesOfTypes(engine: HyperFormula, types: any[][], sheet: number = 0) {
   for (let row = 0; row < types.length; ++row) {
     for (let col = 0; col < types[row].length; ++col) {
@@ -204,24 +227,32 @@ export function expectVerticesOfTypes(engine: HyperFormula, types: any[][], shee
   }
 }
 
+/**
+ *
+ */
 export function columnIndexToSheet(columnIndex: ColumnIndex, width: number, height: number, sheet: number = 0): any[][] {
   const result: any[][] = []
   for (let col = 0; col < width; ++col) {
     const columnMap = columnIndex.getColumnMap(sheet, col)
     for (const [value, {index}] of columnMap.entries()) {
       columnIndex.ensureRecentData(sheet, col, value)
+      // Convert Numeric to native number for comparison
+      const normalizedValue = isNumeric(value) ? value.toNumber() : value
       for (const row of index) {
         result[row] = result[row] ?? []
         if (result[row][col] !== undefined) {
-          throw new Error(`ColumnIndex ambiguity. Expected ${JSON.stringify(result[row][col])}, but found ${JSON.stringify(value)} at row ${JSON.stringify(row)}, column ${JSON.stringify(col)}`)
+          throw new Error(`ColumnIndex ambiguity. Expected ${JSON.stringify(result[row][col])}, but found ${JSON.stringify(normalizedValue)} at row ${JSON.stringify(row)}, column ${JSON.stringify(col)}`)
         }
-        result[row][col] = value
+        result[row][col] = normalizedValue
       }
     }
   }
   return normalizeSheet(result, {width, height})
 }
 
+/**
+ *
+ */
 function normalizeSheet(sheet: RawCellContent[][], dimensions: SheetDimensions): any[][] {
   return Array.from(sheet, row => {
     if (row) {
@@ -232,6 +263,9 @@ function normalizeSheet(sheet: RawCellContent[][], dimensions: SheetDimensions):
   })
 }
 
+/**
+ *
+ */
 export function expectColumnIndexToMatchSheet(expected: Sheet, engine: HyperFormula, sheetId: number = 0) {
   const columnIndex = engine.columnSearch as ColumnIndex
   expect(columnIndex).toBeInstanceOf(ColumnIndex)
@@ -240,6 +274,9 @@ export function expectColumnIndexToMatchSheet(expected: Sheet, engine: HyperForm
   expectArrayWithSameContent(normalizeSheet(expected, dimensions), normalizeSheet(exportedColumnIndex, dimensions))
 }
 
+/**
+ *
+ */
 export function resetSpy(spy: any): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
@@ -269,6 +306,9 @@ export function graphEdgesCount<T>(graph: Graph<T>): number {
   , 0)
 }
 
+/**
+ *
+ */
 export function graphReversedAdjacentNodes<T>(graph: Graph<T>, node: T): T[] {
   const id = (graph as any).nodesIds.get(node)
 

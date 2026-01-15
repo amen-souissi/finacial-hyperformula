@@ -5,8 +5,9 @@
 
 import {Config} from '../Config'
 import {Maybe} from '../Maybe'
+import {Numeric, NumericProvider} from '../Numeric'
 import {ArithmeticHelper} from './ArithmeticHelper'
-import {EmptyValue, getRawValue, RawScalarValue} from './InterpreterValue'
+import {EmptyValue, getRawPrecisionValue, isExtendedNumber, RawScalarValue} from './InterpreterValue'
 
 export enum CriterionType {
   GREATER_THAN = 'GREATER_THAN',
@@ -17,13 +18,36 @@ export enum CriterionType {
   EQUAL = 'EQUAL',
 }
 
+/**
+ * Criterion interface using Numeric for high-precision comparisons.
+ */
 export interface Criterion {
   operator: CriterionType,
-  value: number | string | boolean | null,
+  value: Numeric | string | boolean | null,
 }
 
-export const buildCriterion = (operator: CriterionType, value: number | string | boolean | null) => ({operator, value})
+/**
+ * Build a criterion with the given operator and value.
+ * If value is a number, it will be converted to Numeric for high-precision comparisons.
+ */
+export const buildCriterion = (operator: CriterionType, value: Numeric | number | string | boolean | null): Criterion => {
+  // Convert native number to Numeric for high-precision comparisons
+  if (typeof value === 'number') {
+    return {operator, value: NumericProvider.getGlobalFactory().fromNumber(value)}
+  }
+  return {operator, value}
+}
 
+/**
+ * Type guard to check if criterion value is Numeric
+ */
+function isNumericValue(value: Numeric | string | boolean | null): value is Numeric {
+  return value !== null && typeof value !== 'string' && typeof value !== 'boolean'
+}
+
+/**
+ *
+ */
 export class CriterionBuilder {
   private trueString: string
   private falseString: string
@@ -33,6 +57,10 @@ export class CriterionBuilder {
     this.falseString = config.translationPackage.getMaybeFunctionTranslation('FALSE')?.toLowerCase() ?? 'false'
   }
 
+  
+  /**
+   *
+   */
   public fromCellValue(raw: RawScalarValue, arithmeticHelper: ArithmeticHelper): Maybe<CriterionPackage> {
     if (typeof raw !== 'string' && typeof raw !== 'boolean' && typeof raw !== 'number') {
       return undefined
@@ -46,8 +74,15 @@ export class CriterionBuilder {
     return {raw, lambda: buildCriterionLambda(criterion, arithmeticHelper)}
   }
 
+  
+  /**
+   *
+   */
   public parseCriterion(criterion: RawScalarValue, arithmeticHelper: ArithmeticHelper): Maybe<Criterion> {
-    if (typeof criterion === 'number' || typeof criterion === 'boolean') {
+    if (typeof criterion === 'number') {
+      // Convert native number to Numeric for high-precision comparisons
+      return buildCriterion(CriterionType.EQUAL, NumericProvider.getGlobalFactory().fromNumber(criterion))
+    } else if (typeof criterion === 'boolean') {
       return buildCriterion(CriterionType.EQUAL, criterion)
     } else if (typeof criterion === 'string') {
       const regexResult = ANY_CRITERION_REGEX.exec(criterion)
@@ -74,7 +109,8 @@ export class CriterionBuilder {
           return buildCriterion(criterionType, boolvalue ?? criterionValue)
         }
       } else {
-        return buildCriterion(criterionType, getRawValue(value))
+        // Store Numeric directly for high-precision comparisons
+        return buildCriterion(criterionType, getRawPrecisionValue(value))
       }
     }
     return undefined
@@ -85,6 +121,9 @@ export type CriterionPackage = { raw: string | number | boolean, lambda: Criteri
 
 const ANY_CRITERION_REGEX = /([<>=]+)(.*)/
 
+/**
+ *
+ */
 function StrToCriterionType(str: string): Maybe<CriterionType> {
   switch (str) {
     case '>':
@@ -105,45 +144,71 @@ function StrToCriterionType(str: string): Maybe<CriterionType> {
 }
 
 export type CriterionLambda = (cellValue: RawScalarValue) => boolean
+
+/**
+ * Build criterion lambda using Numeric comparisons for high precision.
+ */
 export const buildCriterionLambda = (criterion: Criterion, arithmeticHelper: ArithmeticHelper): CriterionLambda => {
   switch (criterion.operator) {
     case CriterionType.GREATER_THAN: {
-      if (typeof criterion.value === 'number') {
-        return (cellValue) =>
-          (typeof cellValue === 'number' && arithmeticHelper.floatCmp(cellValue, criterion.value as number) > 0)
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
+        return (cellValue) => {
+          if (isExtendedNumber(cellValue)) {
+            // Use Numeric.comparedTo() for precise comparison
+            return getRawPrecisionValue(cellValue).comparedTo(criterionNumeric) > 0
+          }
+          return false
+        }
       } else {
         return (_cellValue) => false
       }
     }
     case CriterionType.GREATER_THAN_OR_EQUAL: {
-      if (typeof criterion.value === 'number') {
-        return (cellValue) =>
-          (typeof cellValue === 'number' && arithmeticHelper.floatCmp(cellValue, criterion.value as number) >= 0)
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
+        return (cellValue) => {
+          if (isExtendedNumber(cellValue)) {
+            return getRawPrecisionValue(cellValue).comparedTo(criterionNumeric) >= 0
+          }
+          return false
+        }
       } else {
         return (_cellValue) => false
       }
     }
     case CriterionType.LESS_THAN: {
-      if (typeof criterion.value === 'number') {
-        return (cellValue) =>
-          (typeof cellValue === 'number' && arithmeticHelper.floatCmp(cellValue, criterion.value as number) < 0)
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
+        return (cellValue) => {
+          if (isExtendedNumber(cellValue)) {
+            return getRawPrecisionValue(cellValue).comparedTo(criterionNumeric) < 0
+          }
+          return false
+        }
       } else {
         return (_cellValue) => false
       }
     }
     case CriterionType.LESS_THAN_OR_EQUAL: {
-      if (typeof criterion.value === 'number') {
-        return (cellValue) =>
-          (typeof cellValue === 'number' && arithmeticHelper.floatCmp(cellValue, criterion.value as number) <= 0)
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
+        return (cellValue) => {
+          if (isExtendedNumber(cellValue)) {
+            return getRawPrecisionValue(cellValue).comparedTo(criterionNumeric) <= 0
+          }
+          return false
+        }
       } else {
         return (_cellValue) => false
       }
     }
     case CriterionType.EQUAL: {
-      if (typeof criterion.value === 'number') {
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
         return (cellValue) => {
-          if (typeof cellValue === 'number') {
-            return arithmeticHelper.floatCmp(cellValue, criterion.value as number) === 0
+          if (isExtendedNumber(cellValue)) {
+            return getRawPrecisionValue(cellValue).equals(criterionNumeric)
           } else if (typeof cellValue === 'string') {
             if (cellValue === '') {
               return false
@@ -152,7 +217,7 @@ export const buildCriterionLambda = (criterion: Criterion, arithmeticHelper: Ari
             if (val === undefined) {
               return false
             }
-            return arithmeticHelper.floatCmp(val, criterion.value as number) === 0
+            return getRawPrecisionValue(val).equals(criterionNumeric)
           } else {
             return false
           }
@@ -166,10 +231,11 @@ export const buildCriterionLambda = (criterion: Criterion, arithmeticHelper: Ari
       }
     }
     case CriterionType.NOT_EQUAL: {
-      if (typeof criterion.value === 'number') {
+      if (isNumericValue(criterion.value)) {
+        const criterionNumeric = criterion.value
         return (cellValue) => {
-          if (typeof cellValue === 'number') {
-            return arithmeticHelper.floatCmp(cellValue, criterion.value as number) !== 0
+          if (isExtendedNumber(cellValue)) {
+            return !getRawPrecisionValue(cellValue).equals(criterionNumeric)
           } else if (typeof cellValue === 'string') {
             if (cellValue === '') {
               return true
@@ -178,7 +244,7 @@ export const buildCriterionLambda = (criterion: Criterion, arithmeticHelper: Ari
             if (val === undefined) {
               return true
             }
-            return arithmeticHelper.floatCmp(val, criterion.value as number) !== 0
+            return !getRawPrecisionValue(val).equals(criterionNumeric)
           } else {
             return true
           }

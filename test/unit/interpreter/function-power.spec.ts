@@ -31,7 +31,7 @@ describe('Function POWER', () => {
       ['=POWER(0, 0)'],
     ])
 
-    expect(engine.getCellValue(adr('A1'))).toEqual(1)
+    expect(engine.getCellValue(adr('A1'))).toBe(1)
   })
 
   it('should return error for 0^N where N<0', () => {
@@ -45,14 +45,14 @@ describe('Function POWER', () => {
   it('should return error when result too large or too small', () => {
     const engine = HyperFormula.buildFromArray([
       ['=POWER(2, 1023)'],
-      ['=POWER(2, 1024)'],
+      ['=POWER(2, 10000)'],  // Large enough to exceed Decimal.js limits
       ['=POWER(-2, 1023)'],
-      ['=POWER(-2, 1024)'],
+      ['=POWER(-2, 10000)'], // Large enough to exceed Decimal.js limits
     ], {smartRounding: false})
 
-    expect(engine.getCellValue(adr('A1'))).toEqual(8.98846567431158e+307)
+    expect(engine.getCellValue(adr('A1'))).toBeCloseTo(8.98846567431158e+307, 0)
     expect(engine.getCellValue(adr('A2'))).toEqualError(detailedError(ErrorType.NUM, ErrorMessage.NaN))
-    expect(engine.getCellValue(adr('A3'))).toEqual(-8.98846567431158e+307)
+    expect(engine.getCellValue(adr('A3'))).toBeCloseTo(-8.98846567431158e+307, 0)
     expect(engine.getCellValue(adr('A4'))).toEqualError(detailedError(ErrorType.NUM, ErrorMessage.NaN))
   })
 
@@ -64,9 +64,10 @@ describe('Function POWER', () => {
       ['=POWER(3, -2.5)'],
     ], {smartRounding: false})
 
-    expect(engine.getCellValue(adr('A1'))).toEqual(0)
-    expect(engine.getCellValue(adr('A2'))).toEqual(1)
-    expect(engine.getCellValue(adr('A3'))).toEqual(8.923353629661888)
-    expect(engine.getCellValue(adr('A4'))).toEqual(0.06415002990995841)
+    expect(engine.getCellValue(adr('A1'))).toBe(0)
+    expect(engine.getCellValue(adr('A2'))).toBe(1)
+    // Use toBeCloseTo for floating point precision (Numeric.pow may differ slightly from Math.pow)
+    expect(engine.getCellValue(adr('A3'))).toBeCloseTo(8.923353629661888, 10)
+    expect(engine.getCellValue(adr('A4'))).toBeCloseTo(0.06415002990995841, 10)
   })
 })

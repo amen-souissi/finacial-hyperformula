@@ -11,6 +11,7 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
 const MAX_LENGTH = 10
 const DECIMAL_NUMBER_OF_BITS = 255
@@ -18,27 +19,30 @@ const MIN_BASE = 2
 const MAX_BASE = 36
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
+/**
+ *
+ */
 export class RadixConversionPlugin extends FunctionPlugin implements FunctionPluginTypecheck<RadixConversionPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'DEC2BIN': {
       method: 'dec2bin',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 1, maxValue: 10},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 1, maxValue: 10},
       ],
     },
     'DEC2OCT': {
       method: 'dec2oct',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 1, maxValue: 10},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 1, maxValue: 10},
       ],
     },
     'DEC2HEX': {
       method: 'dec2hex',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 1, maxValue: 10},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 1, maxValue: 10},
       ],
     },
     'BIN2DEC': {
@@ -51,14 +55,14 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
       method: 'bin2oct',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'BIN2HEX': {
       method: 'bin2hex',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'OCT2DEC': {
@@ -71,14 +75,14 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
       method: 'oct2bin',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'OCT2HEX': {
       method: 'oct2hex',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'HEX2DEC': {
@@ -91,53 +95,71 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
       method: 'hex2bin',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'HEX2OCT': {
       method: 'hex2oct',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: MAX_LENGTH},
       ],
     },
     'DECIMAL': {
       method: 'decimal',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: MIN_BASE, maxValue: MAX_BASE},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: MIN_BASE, maxValue: MAX_BASE},
       ],
     },
     'BASE': {
       method: 'base',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: MIN_BASE, maxValue: MAX_BASE},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, minValue: 0, maxValue: DECIMAL_NUMBER_OF_BITS},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: MIN_BASE, maxValue: MAX_BASE},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, minValue: 0, maxValue: DECIMAL_NUMBER_OF_BITS},
       ],
     },
   }
 
+  
+  /**
+   *
+   */
   public dec2bin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DEC2BIN'),
-      (value, places) => decimalToBaseWithExactPadding(value, 2, places)
+      // Safe: integer values for base conversion - no precision impact
+      (valueArg: Numeric, placesArg?: Numeric) => decimalToBaseWithExactPadding(valueArg.trunc().toNumber(), 2, placesArg?.trunc().toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public dec2oct(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DEC2OCT'),
-      (value, places) => decimalToBaseWithExactPadding(value, 8, places)
+      // Safe: integer values for base conversion - no precision impact
+      (valueArg: Numeric, placesArg?: Numeric) => decimalToBaseWithExactPadding(valueArg.trunc().toNumber(), 8, placesArg?.trunc().toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public dec2hex(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('DEC2HEX'),
-      (value, places) => decimalToBaseWithExactPadding(value, 16, places)
+      (valueArg: Numeric, placesArg?: Numeric) => decimalToBaseWithExactPadding(valueArg.toNumber(), 16, placesArg?.toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public bin2dec(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('BIN2DEC'), (binary) => {
+    return this.runFunction(ast.args, state, this.metadata('BIN2DEC'), (binary: string) => {
       const binaryWithSign = coerceStringToBase(binary, 2, MAX_LENGTH)
       if (binaryWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotBinary)
@@ -146,28 +168,42 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
     })
   }
 
+  
+  /**
+   *
+   */
   public bin2oct(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('BIN2OCT'), (binary, places) => {
+    return this.runFunction(ast.args, state, this.metadata('BIN2OCT'), (binary: string, placesArg?: Numeric) => {
       const binaryWithSign = coerceStringToBase(binary, 2, MAX_LENGTH)
       if (binaryWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotBinary)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(binaryWithSign, 2), 8, places)
+      // Safe: integer padding places - no precision impact
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(binaryWithSign, 2), 8, placesArg?.trunc().toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public bin2hex(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('BIN2HEX'), (binary, places) => {
+    return this.runFunction(ast.args, state, this.metadata('BIN2HEX'), (binary: string, placesArg?: Numeric) => {
       const binaryWithSign = coerceStringToBase(binary, 2, MAX_LENGTH)
       if (binaryWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotBinary)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(binaryWithSign, 2), 16, places)
+      // Safe: integer padding places - no precision impact
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(binaryWithSign, 2), 16, placesArg?.trunc().toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public oct2dec(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('OCT2DEC'), (octal) => {
+    return this.runFunction(ast.args, state, this.metadata('OCT2DEC'), (octal: string) => {
       const octalWithSign = coerceStringToBase(octal, 8, MAX_LENGTH)
       if (octalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotOctal)
@@ -176,28 +212,41 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
     })
   }
 
+  
+  /**
+   *
+   */
   public oct2bin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('OCT2BIN'), (octal, places) => {
+    return this.runFunction(ast.args, state, this.metadata('OCT2BIN'), (octal: string, placesArg?: Numeric) => {
       const octalWithSign = coerceStringToBase(octal, 8, MAX_LENGTH)
       if (octalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotOctal)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(octalWithSign, 8), 2, places)
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(octalWithSign, 8), 2, placesArg?.toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public oct2hex(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('OCT2HEX'), (octal, places) => {
+    return this.runFunction(ast.args, state, this.metadata('OCT2HEX'), (octal: string, placesArg?: Numeric) => {
       const octalWithSign = coerceStringToBase(octal, 8, MAX_LENGTH)
       if (octalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotOctal)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(octalWithSign, 8), 16, places)
+      // Safe: integer padding places - no precision impact
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(octalWithSign, 8), 16, placesArg?.trunc().toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public hex2dec(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('HEX2DEC'), (hexadecimal) => {
+    return this.runFunction(ast.args, state, this.metadata('HEX2DEC'), (hexadecimal: string) => {
       const hexadecimalWithSign = coerceStringToBase(hexadecimal, 16, MAX_LENGTH)
       if (hexadecimalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotHex)
@@ -206,32 +255,55 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
     })
   }
 
+  
+  /**
+   *
+   */
   public hex2bin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('HEX2BIN'), (hexadecimal, places) => {
+    return this.runFunction(ast.args, state, this.metadata('HEX2BIN'), (hexadecimal: string, placesArg?: Numeric) => {
       const hexadecimalWithSign = coerceStringToBase(hexadecimal, 16, MAX_LENGTH)
       if (hexadecimalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotHex)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(hexadecimalWithSign, 16), 2, places)
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(hexadecimalWithSign, 16), 2, placesArg?.toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public hex2oct(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('HEX2OCT'), (hexadecimal, places) => {
+    return this.runFunction(ast.args, state, this.metadata('HEX2OCT'), (hexadecimal: string, placesArg?: Numeric) => {
       const hexadecimalWithSign = coerceStringToBase(hexadecimal, 16, MAX_LENGTH)
       if (hexadecimalWithSign === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotHex)
       }
-      return decimalToBaseWithExactPadding(twoComplementToDecimal(hexadecimalWithSign, 16), 8, places)
+      // Safe: integer padding places - no precision impact
+      return decimalToBaseWithExactPadding(twoComplementToDecimal(hexadecimalWithSign, 16), 8, placesArg?.trunc().toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   public base(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('BASE'), decimalToBaseWithMinimumPadding)
+    return this.runFunction(ast.args, state, this.metadata('BASE'), 
+      // Safe: integer values for base conversion - no precision impact
+      (valueArg: Numeric, baseArg: Numeric, placesArg?: Numeric) => 
+        decimalToBaseWithMinimumPadding(valueArg.trunc().toNumber(), baseArg.trunc().toNumber(), placesArg?.trunc().toNumber())
+    )
   }
 
+  
+  /**
+   *
+   */
   public decimal(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('DECIMAL'), (arg, base) => {
+    return this.runFunction(ast.args, state, this.metadata('DECIMAL'), (arg: string, baseArg: Numeric) => {
+      // Safe: integer base value - no precision impact
+      const base = baseArg.trunc().toNumber()
       const input = coerceStringToBase(arg, base, DECIMAL_NUMBER_OF_BITS)
       if (input === undefined) {
         return new CellError(ErrorType.NUM, ErrorMessage.NotHex)
@@ -241,6 +313,9 @@ export class RadixConversionPlugin extends FunctionPlugin implements FunctionPlu
   }
 }
 
+/**
+ *
+ */
 function coerceStringToBase(value: string, base: number, maxLength: number): Maybe<string> {
   const baseAlphabet = ALPHABET.substr(0, base)
   const regex = new RegExp(`^[${baseAlphabet}]+$`)
@@ -250,6 +325,9 @@ function coerceStringToBase(value: string, base: number, maxLength: number): May
   return value
 }
 
+/**
+ *
+ */
 function decimalToBaseWithExactPadding(value: number, base: number, places?: number): string | CellError {
   if (value > maxValFromBase(base)) {
     return new CellError(ErrorType.NUM, ErrorMessage.ValueBaseLarge)
@@ -267,14 +345,23 @@ function decimalToBaseWithExactPadding(value: number, base: number, places?: num
   }
 }
 
+/**
+ *
+ */
 function minValFromBase(base: number) {
   return -Math.pow(base, MAX_LENGTH) / 2
 }
 
+/**
+ *
+ */
 function maxValFromBase(base: number) {
   return -minValFromBase(base) - 1
 }
 
+/**
+ *
+ */
 function decimalToBaseWithMinimumPadding(value: number, base: number, places?: number): string {
   const result = decimalToRadixComplement(value, base)
   if (places !== undefined && places > result.length) {
@@ -284,11 +371,17 @@ function decimalToBaseWithMinimumPadding(value: number, base: number, places?: n
   }
 }
 
+/**
+ *
+ */
 function decimalToRadixComplement(value: number, base: number): string {
   const offset = value < 0 ? Math.pow(base, MAX_LENGTH) : 0
   return (value + offset).toString(base).toUpperCase()
 }
 
+/**
+ *
+ */
 function twoComplementToDecimal(value: string, base: number): number {
   const parsed = parseInt(value, base)
   const offset = Math.pow(base, MAX_LENGTH)

@@ -7,10 +7,14 @@ import {CellError, ErrorType} from '../../Cell'
 import {ErrorMessage} from '../../error-message'
 import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
-import {getRawValue, InterpreterValue, isExtendedNumber} from '../InterpreterValue'
+import {getRawPrecisionValue, InterpreterValue, isExtendedNumber} from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {NumericProvider, Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class SumprodPlugin extends FunctionPlugin implements FunctionPluginTypecheck<SumprodPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'SUMPRODUCT': {
@@ -22,6 +26,10 @@ export class SumprodPlugin extends FunctionPlugin implements FunctionPluginTypec
     },
   }
 
+  
+  /**
+   *
+   */
   public sumproduct(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SUMPRODUCT'), (...args: SimpleRangeValue[]) => {
       const width = args[0].width()
@@ -32,10 +40,12 @@ export class SumprodPlugin extends FunctionPlugin implements FunctionPluginTypec
         }
       }
 
-      let ret = 0
+      const factory = NumericProvider.getGlobalFactory()
+      let ret: Numeric = factory.zero()
       const iterators = args.map(arg => arg.iterateValuesFromTopLeftCorner())
       for (let i = 0; i < width * height; i++) {
-        let acc = 1
+        let acc: Numeric = factory.one()
+        let hasValue = true
         for (const it of iterators) {
           const val = it.next().value
           if (val instanceof CellError) {
@@ -43,14 +53,18 @@ export class SumprodPlugin extends FunctionPlugin implements FunctionPluginTypec
           }
           const coercedVal = this.coerceScalarToNumberOrError(val)
           if (isExtendedNumber(coercedVal)) {
-            acc *= getRawValue(coercedVal)
+            acc = acc.times(getRawPrecisionValue(coercedVal))
           } else {
-            acc = 0
+            hasValue = false
+            break
           }
         }
-        ret += acc
+        if (hasValue) {
+          ret = ret.plus(acc)
+        }
       }
 
+      // Return Numeric directly - conversion to number happens at output (Exporter)
       return ret
     })
   }

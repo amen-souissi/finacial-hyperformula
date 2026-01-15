@@ -7,42 +7,62 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class LogarithmPlugin extends FunctionPlugin implements FunctionPluginTypecheck<LogarithmPlugin> {
 
   public static implementedFunctions: ImplementedFunctions = {
     'LOG10': {
       method: 'log10',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'LOG': {
       method: 'log',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 10, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 10, greaterThan: 0},
       ]
     },
     'LN': {
       method: 'ln',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
   }
 
+  
+  /**
+   *
+   */
   public log10(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('LOG10'), Math.log10)
-  }
-
-  public log(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('LOG'),
-      (arg: number, base: number) => Math.log(arg) / Math.log(base)
+    return this.runFunction(ast.args, state, this.metadata('LOG10'), 
+      (arg: Numeric) => arg.log10()
     )
   }
 
+  
+  /**
+   *
+   */
+  public log(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
+    return this.runFunction(ast.args, state, this.metadata('LOG'),
+      (arg: Numeric, base: Numeric) => arg.ln().dividedBy(base.ln())
+    )
+  }
+
+  
+  /**
+   *
+   */
   public ln(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('LN'), Math.log)
+    return this.runFunction(ast.args, state, this.metadata('LN'), 
+      (arg: Numeric) => arg.ln()
+    )
   }
 }

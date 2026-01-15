@@ -7,13 +7,17 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class ExpPlugin extends FunctionPlugin implements FunctionPluginTypecheck<ExpPlugin> {
   public static implementedFunctions: ImplementedFunctions= {
     'EXP': {
       method: 'exp',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ],
     },
   }
@@ -27,6 +31,8 @@ export class ExpPlugin extends FunctionPlugin implements FunctionPluginTypecheck
    * @param state
    */
   public exp(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('EXP'), Math.exp)
+    return this.runFunction(ast.args, state, this.metadata('EXP'), 
+      (arg: Numeric) => arg.exp()
+    )
   }
 }

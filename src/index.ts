@@ -3,17 +3,29 @@
  * Copyright (c) 2025 Handsoncode. All rights reserved.
  */
 
-import {SimpleCellRange} from './AbsoluteCellRange'
-import {ArraySize} from './ArraySize'
-import {CellError, CellType, CellValueDetailedType, CellValueType, ErrorType, SimpleCellAddress} from './Cell'
-import {RawCellContent} from './CellContentParser'
-import {CellValue, DetailedCellError, NoErrorCellValue} from './CellValue'
-import {Config} from './Config'
-import {ColumnRowIndex} from './CrudOperations'
+import { SimpleCellRange } from './AbsoluteCellRange'
+import { ArraySize } from './ArraySize'
+import {
+  CellError,
+  CellType,
+  CellValueDetailedType,
+  CellValueType,
+  ErrorType,
+  SimpleCellAddress,
+} from './Cell'
+import { RawCellContent } from './CellContentParser'
+import {
+  CellValue,
+  DetailedCellError,
+  GetCellValueOptions,
+  NoErrorCellValue,
+} from './CellValue'
+import { Config } from './Config'
+import { ColumnRowIndex } from './CrudOperations'
 import {
   AlwaysDense,
   AlwaysSparse,
-  DenseSparseChooseBasedOnThreshold
+  DenseSparseChooseBasedOnThreshold,
 } from './DependencyGraph/AddressMapping/ChooseAddressMappingPolicy'
 import {
   ConfigValueTooBigError,
@@ -42,20 +54,42 @@ import {
   SheetSizeLimitExceededError,
   SourceLocationHasArrayError,
   TargetLocationHasArrayError,
-  UnableToParseError
+  UnableToParseError,
 } from './errors'
-import {ExportedCellChange, ExportedChange, ExportedNamedExpressionChange} from './Exporter'
-import {HyperFormula} from './HyperFormula'
-import {RawTranslationPackage} from './i18n'
+import {
+  ExportedCellChange,
+  ExportedChange,
+  ExportedNamedExpressionChange,
+} from './Exporter'
+import { HyperFormula } from './HyperFormula'
+import { RawTranslationPackage } from './i18n'
 import enGB from './i18n/languages/enGB'
-import {FunctionArgument, FunctionPlugin, FunctionPluginDefinition, FunctionArgumentType, ImplementedFunctions, FunctionMetadata, EmptyValue} from './interpreter'
-import {FormatInfo} from './interpreter/InterpreterValue'
+import {
+  FunctionArgument,
+  FunctionPlugin,
+  FunctionPluginDefinition,
+  FunctionArgumentType,
+  ImplementedFunctions,
+  FunctionMetadata,
+  EmptyValue,
+} from './interpreter'
+import { FormatInfo } from './interpreter/InterpreterValue'
 import * as plugins from './interpreter/plugin'
-import {SimpleRangeValue} from './SimpleRangeValue'
-import {NamedExpression, NamedExpressionOptions} from './NamedExpressions'
-import {SerializedNamedExpression} from './Serialization'
-import {Sheet, SheetDimensions, Sheets} from './Sheet'
-import {ConfigParams} from './ConfigParams'
+import { SimpleRangeValue } from './SimpleRangeValue'
+import { NamedExpression, NamedExpressionOptions } from './NamedExpressions'
+import { SerializedNamedExpression } from './Serialization'
+import { Sheet, SheetDimensions, Sheets } from './Sheet'
+import { ConfigParams, NumericImplementation } from './ConfigParams'
+import {
+  RoundingMode,
+  NumericConfig,
+  Numeric,
+  NumericFactory,
+  NumericProvider,
+  DecimalNumericFactory,
+  NativeNumericFactory,
+  isNumeric,
+} from './Numeric'
 
 /**
  * Aggregate class for default export
@@ -86,17 +120,22 @@ class HyperFormulaNS extends HyperFormula {
   public static LanguageNotRegisteredError = LanguageNotRegisteredError
   public static LanguageAlreadyRegisteredError = LanguageAlreadyRegisteredError
   public static MissingTranslationError = MissingTranslationError
-  public static NamedExpressionDoesNotExistError = NamedExpressionDoesNotExistError
-  public static NamedExpressionNameIsAlreadyTakenError = NamedExpressionNameIsAlreadyTakenError
-  public static NamedExpressionNameIsInvalidError = NamedExpressionNameIsInvalidError
+  public static NamedExpressionDoesNotExistError =
+    NamedExpressionDoesNotExistError
+  public static NamedExpressionNameIsAlreadyTakenError =
+    NamedExpressionNameIsAlreadyTakenError
+  public static NamedExpressionNameIsInvalidError =
+    NamedExpressionNameIsInvalidError
   public static NoOperationToRedoError = NoOperationToRedoError
   public static NoOperationToUndoError = NoOperationToUndoError
-  public static NoRelativeAddressesAllowedError = NoRelativeAddressesAllowedError
+  public static NoRelativeAddressesAllowedError =
+    NoRelativeAddressesAllowedError
   public static NoSheetWithIdError = NoSheetWithIdError
   public static NoSheetWithNameError = NoSheetWithNameError
   public static NotAFormulaError = NotAFormulaError
   public static NothingToPasteError = NothingToPasteError
-  public static ProtectedFunctionTranslationError = ProtectedFunctionTranslationError
+  public static ProtectedFunctionTranslationError =
+    ProtectedFunctionTranslationError
   public static SheetNameAlreadyTakenError = SheetNameAlreadyTakenError
   public static SheetSizeLimitExceededError = SheetSizeLimitExceededError
   public static SourceLocationHasArrayError = SourceLocationHasArrayError
@@ -124,6 +163,7 @@ export {
   AlwaysSparse,
   DenseSparseChooseBasedOnThreshold,
   CellValue,
+  GetCellValueOptions,
   NoErrorCellValue,
   ConfigParams,
   ExportedChange,
@@ -184,4 +224,14 @@ export {
   TargetLocationHasArrayError,
   UnableToParseError,
   SerializedNamedExpression,
+  // Precision Number System
+  RoundingMode,
+  NumericConfig,
+  NumericImplementation,
+  Numeric,
+  NumericFactory,
+  NumericProvider,
+  DecimalNumericFactory,
+  NativeNumericFactory,
+  isNumeric,
 }

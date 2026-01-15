@@ -9,7 +9,11 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class RandomPlugin extends FunctionPlugin implements FunctionPluginTypecheck<RandomPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'RAND': {
@@ -20,8 +24,8 @@ export class RandomPlugin extends FunctionPlugin implements FunctionPluginTypech
     'RANDBETWEEN': {
       method: 'randbetween',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
       isVolatile: true,
     },
@@ -40,9 +44,16 @@ export class RandomPlugin extends FunctionPlugin implements FunctionPluginTypech
     return this.runFunction(ast.args, state, this.metadata('RAND'), Math.random)
   }
 
+  
+  /**
+   *
+   */
   public randbetween(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('RANDBETWEEN'),
-      (lower: number, upper: number) => {
+      (lowerArg: Numeric, upperArg: Numeric) => {
+        // Safe: integer bounds for RANDBETWEEN - values are rounded after validation
+        let lower = lowerArg.toNumber()
+        let upper = upperArg.toNumber()
         if (upper < lower) {
           return new CellError(ErrorType.NUM, ErrorMessage.WrongOrder)
         }

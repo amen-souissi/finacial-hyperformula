@@ -10,9 +10,10 @@ import {SheetsNotEqual} from '../../errors'
 import {Maybe} from '../../Maybe'
 import {Ast, AstNodeType, CellRangeAst, ProcedureAst} from '../../parser'
 import {ColumnRangeAst, RowRangeAst} from '../../parser/Ast'
+import {Numeric, NumericProvider, isNumeric} from '../../Numeric'
 import {coerceBooleanToNumber} from '../ArithmeticHelper'
 import {InterpreterState} from '../InterpreterState'
-import {EmptyValue, ExtendedNumber, getRawValue, InternalScalarValue, isExtendedNumber} from '../InterpreterValue'
+import {EmptyValue, ExtendedNumber, getRawPrecisionValue, InternalScalarValue, isExtendedNumber} from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
 import {RangeVertex} from '../../DependencyGraph'
@@ -23,58 +24,106 @@ export type MapOperation<T> = (arg: ExtendedNumber) => T
 
 type coercionOperation = (arg: InternalScalarValue) => Maybe<ExtendedNumber | CellError>
 
-function zeroForInfinite(value: InternalScalarValue) {
-  if (isExtendedNumber(value) && !Number.isFinite(getRawValue(value))) {
-    return 0
+/**
+ * Returns zero if value is infinite, otherwise returns value unchanged.
+ */
+function zeroForInfinite(value: InternalScalarValue): InternalScalarValue {
+  if (isExtendedNumber(value) && !getRawPrecisionValue(value).isFinite()) {
+    return NumericProvider.getGlobalFactory().zero()
   } else {
     return value
   }
 }
 
+/**
+ * MomentsAggregate using Numeric for high-precision calculations.
+ * Used for AVERAGE, VAR, STDEV, etc.
+ */
 class MomentsAggregate {
-
-  public static empty = new MomentsAggregate(0, 0, 0)
+  private static readonly factory = NumericProvider.getGlobalFactory()
+  public static empty = new MomentsAggregate(
+    MomentsAggregate.factory.zero(),
+    MomentsAggregate.factory.zero(),
+    0
+  )
 
   constructor(
-    public readonly sumsq: number,
-    public readonly sum: number,
+    public readonly sumsq: Numeric,
+    public readonly sum: Numeric,
     public readonly count: number,
   ) {
   }
 
-  public static single(arg: number): MomentsAggregate {
-    return new MomentsAggregate(arg * arg, arg, 1)
+  
+  /**
+   * Create a MomentsAggregate from a single Numeric value
+   */
+  public static single(arg: Numeric): MomentsAggregate {
+    return new MomentsAggregate(arg.times(arg), arg, 1)
   }
 
+  
+  /**
+   * Compose two MomentsAggregate instances
+   */
   public compose(other: MomentsAggregate) {
-    return new MomentsAggregate(this.sumsq + other.sumsq, this.sum + other.sum, this.count + other.count)
+    return new MomentsAggregate(
+      this.sumsq.plus(other.sumsq),
+      this.sum.plus(other.sum),
+      this.count + other.count
+    )
   }
 
-  public averageValue(): Maybe<number> {
+  
+  /**
+   * Calculate average value (returns Numeric for precision)
+   */
+  public averageValue(): Maybe<Numeric> {
     if (this.count > 0) {
-      return this.sum / this.count
+      const countNumeric = MomentsAggregate.factory.fromNumber(this.count)
+      return this.sum.dividedBy(countNumeric)
     } else {
       return undefined
     }
   }
 
-  public varSValue(): Maybe<number> {
+  
+  /**
+   * Calculate sample variance (returns Numeric for precision)
+   */
+  public varSValue(): Maybe<Numeric> {
     if (this.count > 1) {
-      return (this.sumsq - (this.sum * this.sum) / this.count) / (this.count - 1)
+      const countNumeric = MomentsAggregate.factory.fromNumber(this.count)
+      const countMinusOne = MomentsAggregate.factory.fromNumber(this.count - 1)
+      // (sumsq - (sum * sum) / count) / (count - 1)
+      const sumSquared = this.sum.times(this.sum)
+      const meanSq = sumSquared.dividedBy(countNumeric)
+      return this.sumsq.minus(meanSq).dividedBy(countMinusOne)
     } else {
       return undefined
     }
   }
 
-  public varPValue(): Maybe<number> {
+  
+  /**
+   * Calculate population variance (returns Numeric for precision)
+   */
+  public varPValue(): Maybe<Numeric> {
     if (this.count > 0) {
-      return (this.sumsq - (this.sum * this.sum) / this.count) / this.count
+      const countNumeric = MomentsAggregate.factory.fromNumber(this.count)
+      // (sumsq - (sum * sum) / count) / count
+      const sumSquared = this.sum.times(this.sum)
+      const meanSq = sumSquared.dividedBy(countNumeric)
+      return this.sumsq.minus(meanSq).dividedBy(countNumeric)
     } else {
       return undefined
     }
   }
 }
 
+/**
+ *
+ */
 export class NumericAggregationPlugin extends FunctionPlugin implements FunctionPluginTypecheck<NumericAggregationPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'SUM': {
@@ -213,7 +262,7 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     'SUBTOTAL': {
       method: 'subtotal',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
         {argumentType: FunctionArgumentType.ANY}
       ],
       repeatLastArgs: 1,
@@ -241,8 +290,13 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     return this.doSum(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public sumsq(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
-    return this.reduce(ast.args, state, 0, 'SUMSQ', this.addWithEpsilonRaw, (arg: ExtendedNumber) => Math.pow(getRawValue(arg), 2), strictlyNumbers)
+    const factory = NumericProvider.getGlobalFactory()
+    return this.reduce(ast.args, state, factory.zero(), 'SUMSQ', this.addWithEpsilonRaw, (arg: ExtendedNumber) => getRawPrecisionValue(arg).pow(2), strictlyNumbers)
   }
 
   /**
@@ -257,10 +311,15 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     return this.doMax(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public maxa(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
-    const value = this.reduce(ast.args, state, Number.NEGATIVE_INFINITY, 'MAXA',
-      (left: number, right: number) => Math.max(left, right),
-      getRawValue, numbersBooleans)
+    const factory = NumericProvider.getGlobalFactory()
+    const value = this.reduce(ast.args, state, factory.NEGATIVE_INFINITY(), 'MAXA',
+      (left: Numeric, right: Numeric) => left.greaterThan(right) ? left : right,
+      getRawPrecisionValue, numbersBooleans)
 
     return zeroForInfinite(value)
   }
@@ -277,30 +336,51 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     return this.doMin(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public mina(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
-    const value = this.reduce(ast.args, state, Number.POSITIVE_INFINITY, 'MINA',
-      (left: number, right: number) => Math.min(left, right),
-      getRawValue, numbersBooleans)
+    const factory = NumericProvider.getGlobalFactory()
+    const value = this.reduce(ast.args, state, factory.POSITIVE_INFINITY(), 'MINA',
+      (left: Numeric, right: Numeric) => left.lessThan(right) ? left : right,
+      getRawPrecisionValue, numbersBooleans)
 
     return zeroForInfinite(value)
   }
 
+  
+  /**
+   *
+   */
   public count(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doCount(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public counta(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doCounta(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public average(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doAverage(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public averagea(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     const result = this.reduce<MomentsAggregate>(ast.args, state, MomentsAggregate.empty, '_AGGREGATE_A',
       (left, right) => left.compose(right),
-      (arg): MomentsAggregate => MomentsAggregate.single(getRawValue(arg)),
+      (arg): MomentsAggregate => MomentsAggregate.single(getRawPrecisionValue(arg)),
       numbersBooleans
     )
 
@@ -311,14 +391,26 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   public vars(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doVarS(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public varp(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doVarP(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public vara(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregateA(ast.args, state)
 
@@ -329,6 +421,10 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   public varpa(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregateA(ast.args, state)
 
@@ -339,14 +435,26 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   public stdevs(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doStdevS(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public stdevp(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doStdevP(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public stdeva(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregateA(ast.args, state)
 
@@ -354,10 +462,15 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
       return result
     } else {
       const val = result.varSValue()
-      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : Math.sqrt(val)
+      // Return Numeric directly - use Numeric.sqrt() for precision
+      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : val.sqrt()
     }
   }
 
+  
+  /**
+   *
+   */
   public stdevpa(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregateA(ast.args, state)
 
@@ -365,19 +478,36 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
       return result
     } else {
       const val = result.varPValue()
-      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : Math.sqrt(val)
+      // Return Numeric directly - use Numeric.sqrt() for precision
+      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : val.sqrt()
     }
   }
 
+  
+  /**
+   *
+   */
   public product(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     return this.doProduct(ast.args, state)
   }
 
+  
+  /**
+   *
+   */
   public subtotal(ast: ProcedureAst, state: InterpreterState): InternalScalarValue {
     if (ast.args.length < 2) {
       return new CellError(ErrorType.NA, ErrorMessage.WrongArgNumber)
     }
-    const functionType = this.coerceToType(this.evaluateAst(ast.args[0], state), {argumentType: FunctionArgumentType.NUMBER}, state)
+    const functionTypeNumeric = this.coerceToType(this.evaluateAst(ast.args[0], state), {argumentType: FunctionArgumentType.NUMERIC}, state)
+    if (functionTypeNumeric instanceof CellError) {
+      return functionTypeNumeric
+    }
+    if (!isNumeric(functionTypeNumeric)) {
+      return new CellError(ErrorType.VALUE, ErrorMessage.BadMode)
+    }
+    // Safe: integer function type for SUBTOTAL mode - no precision impact
+    const functionType = (functionTypeNumeric ).trunc().toNumber()
     const args = ast.args.slice(1)
     switch (functionType) {
       case 1:
@@ -418,26 +548,38 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   private reduceAggregate(args: Ast[], state: InterpreterState): MomentsAggregate | CellError {
     return this.reduce<MomentsAggregate>(args, state, MomentsAggregate.empty, '_AGGREGATE', (left, right) => {
         return left.compose(right)
       }, (arg): MomentsAggregate => {
-        return MomentsAggregate.single(getRawValue(arg))
+        return MomentsAggregate.single(getRawPrecisionValue(arg))
       },
       strictlyNumbers
     )
   }
 
+  
+  /**
+   *
+   */
   private reduceAggregateA(args: Ast[], state: InterpreterState): MomentsAggregate | CellError {
     return this.reduce<MomentsAggregate>(args, state, MomentsAggregate.empty, '_AGGREGATE_A', (left, right) => {
         return left.compose(right)
       }, (arg): MomentsAggregate => {
-        return MomentsAggregate.single(getRawValue(arg))
+        return MomentsAggregate.single(getRawPrecisionValue(arg))
       },
       numbersBooleans
     )
   }
 
+  
+  /**
+   *
+   */
   private doAverage(args: Ast[], state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregate(args, state)
 
@@ -448,6 +590,10 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   private doVarS(args: Ast[], state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregate(args, state)
 
@@ -458,6 +604,10 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   private doVarP(args: Ast[], state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregate(args, state)
 
@@ -468,6 +618,10 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
     }
   }
 
+  
+  /**
+   *
+   */
   private doStdevS(args: Ast[], state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregate(args, state)
 
@@ -475,10 +629,15 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
       return result
     } else {
       const val = result.varSValue()
-      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : Math.sqrt(val)
+      // Return Numeric directly - use Numeric.sqrt() for precision
+      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : val.sqrt()
     }
   }
 
+  
+  /**
+   *
+   */
   private doStdevP(args: Ast[], state: InterpreterState): InternalScalarValue {
     const result = this.reduceAggregate(args, state)
 
@@ -486,52 +645,89 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
       return result
     } else {
       const val = result.varPValue()
-      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : Math.sqrt(val)
+      // Return Numeric directly - use Numeric.sqrt() for precision
+      return val === undefined ? new CellError(ErrorType.DIV_BY_ZERO) : val.sqrt()
     }
   }
 
+  
+  /**
+   *
+   */
   private doCount(args: Ast[], state: InterpreterState): InternalScalarValue {
+    // COUNT returns a native number (count of numeric values)
+    // Only counts actual numbers, not errors or strings
     return this.reduce(args, state, 0, 'COUNT',
       (left: number, right: number) => left + right,
-      getRawValue,
-      (arg) => (isExtendedNumber(arg)) ? 1 : 0
+      (_arg: ExtendedNumber) => 1, // Each numeric value counts as 1
+      (arg) => (isExtendedNumber(arg) && !(arg instanceof CellError)) ? NumericProvider.getGlobalFactory().one() : undefined
     )
   }
 
+  
+  /**
+   *
+   */
   private doCounta(args: Ast[], state: InterpreterState): InternalScalarValue {
+    // COUNTA returns a native number (count of non-empty values)
+    // Counts everything except empty values, including errors
     return this.reduce(args, state, 0, 'COUNTA', (left: number, right: number) => left + right,
-      getRawValue,
-      (arg) => (arg === EmptyValue) ? 0 : 1
+      (_arg: ExtendedNumber) => 1, // Each non-empty value counts as 1
+      (arg) => {
+        if (arg === EmptyValue) return undefined
+        if (arg instanceof CellError) return NumericProvider.getGlobalFactory().one() // Count errors
+        return isExtendedNumber(arg) ? NumericProvider.getGlobalFactory().one() : NumericProvider.getGlobalFactory().one()
+      }
     )
   }
 
+  
+  /**
+   *
+   */
   private doMax(args: Ast[], state: InterpreterState): InternalScalarValue {
-    const value = this.reduce(args, state, Number.NEGATIVE_INFINITY, 'MAX',
-      (left: number, right: number) => Math.max(left, right),
-      getRawValue, strictlyNumbers
+    const factory = NumericProvider.getGlobalFactory()
+    const value = this.reduce(args, state, factory.NEGATIVE_INFINITY(), 'MAX',
+      (left: Numeric, right: Numeric) => left.greaterThan(right) ? left : right,
+      getRawPrecisionValue, strictlyNumbers
     )
 
     return zeroForInfinite(value)
   }
 
+  
+  /**
+   *
+   */
   private doMin(args: Ast[], state: InterpreterState): InternalScalarValue {
-    const value = this.reduce(args, state, Number.POSITIVE_INFINITY, 'MIN',
-      (left: number, right: number) => Math.min(left, right),
-      getRawValue, strictlyNumbers
+    const factory = NumericProvider.getGlobalFactory()
+    const value = this.reduce(args, state, factory.POSITIVE_INFINITY(), 'MIN',
+      (left: Numeric, right: Numeric) => left.lessThan(right) ? left : right,
+      getRawPrecisionValue, strictlyNumbers
     )
 
     return zeroForInfinite(value)
   }
 
+  
+  /**
+   *
+   */
   private doSum(args: Ast[], state: InterpreterState): InternalScalarValue {
-    return this.reduce(args, state, 0, 'SUM', this.addWithEpsilonRaw, getRawValue, strictlyNumbers)
+    const factory = NumericProvider.getGlobalFactory()
+    return this.reduce(args, state, factory.zero(), 'SUM', this.addWithEpsilonRaw, getRawPrecisionValue, strictlyNumbers)
   }
 
+  
+  /**
+   *
+   */
   private doProduct(args: Ast[], state: InterpreterState): InternalScalarValue {
-    return this.reduce(args, state, 1, 'PRODUCT', (left, right) => left * right, getRawValue, strictlyNumbers)
+    const factory = NumericProvider.getGlobalFactory()
+    return this.reduce(args, state, factory.one(), 'PRODUCT', (left: Numeric, right: Numeric) => left.times(right), getRawPrecisionValue, strictlyNumbers)
   }
 
-  private addWithEpsilonRaw = (left: number, right: number) => this.arithmeticHelper.addWithEpsilonRaw(left, right)
+  private addWithEpsilonRaw = (left: Numeric, right: Numeric): Numeric => this.arithmeticHelper.addWithEpsilonRaw(left, right)
 
   /**
    * Reduces procedure arguments with given reducing function
@@ -566,7 +762,7 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
       if (value instanceof SimpleRangeValue) {
         const coercedRangeValues = Array.from(value.valuesFromTopLeftCorner())
           .map(coercionFunction)
-          .filter((arg) => (arg !== undefined)) as (CellError | number)[]
+          .filter((arg) => (arg !== undefined)) as (CellError | ExtendedNumber)[]
 
         return coercedRangeValues
           .map((arg) => {
@@ -715,6 +911,9 @@ export class NumericAggregationPlugin extends FunctionPlugin implements Function
   }
 }
 
+/**
+ *
+ */
 function strictlyNumbers(arg: InternalScalarValue): Maybe<CellError | ExtendedNumber> {
   if (isExtendedNumber(arg) || arg instanceof CellError) {
     return arg
@@ -723,13 +922,16 @@ function strictlyNumbers(arg: InternalScalarValue): Maybe<CellError | ExtendedNu
   }
 }
 
+/**
+ *
+ */
 function numbersBooleans(arg: InternalScalarValue): Maybe<CellError | ExtendedNumber> {
   if (typeof arg === 'boolean') {
-    return coerceBooleanToNumber(arg)
+    return NumericProvider.getGlobalFactory().create(arg ? 1 : 0)
   } else if (isExtendedNumber(arg) || arg instanceof CellError) {
     return arg
   } else if (typeof arg === 'string') {
-    return 0
+    return NumericProvider.getGlobalFactory().zero()
   } else {
     return undefined
   }
