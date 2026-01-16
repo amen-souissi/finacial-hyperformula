@@ -11,6 +11,7 @@ import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, Implement
 import {CellError, ErrorType} from '../../Cell'
 import {ErrorMessage} from '../../error-message'
 import {Maybe} from '../../Maybe'
+import {Numeric} from '../../Numeric'
 
 enum AbsStyle {
   FullyAbsolute = 1,
@@ -19,20 +20,27 @@ enum AbsStyle {
   FullyRelative = 4,
 }
 
+/**
+ *
+ */
 export class AddressPlugin extends FunctionPlugin implements FunctionPluginTypecheck<AddressPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'ADDRESS': {
       method: 'address',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true, defaultValue: 1, minValue: 1, maxValue: 4},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, defaultValue: 1, minValue: 1, maxValue: 4},
         {argumentType: FunctionArgumentType.BOOLEAN, optionalArg: true, defaultValue: true},
         {argumentType: FunctionArgumentType.STRING, optionalArg: true},
       ]
     },
   }
 
+  
+  /**
+   *
+   */
   private verifyAddressArguments(row: number, col: number, abs: number, useA1Style: boolean): Maybe<CellError> {
     if (useA1Style) {
       if (row < 1 || col < 1) {
@@ -56,8 +64,16 @@ export class AddressPlugin extends FunctionPlugin implements FunctionPluginTypec
     return undefined
   }
 
+  
+  /**
+   *
+   */
   public address(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ADDRESS'), (row: number, col: number, abs: number, useA1Style: boolean, sheetName: string): InterpreterValue => {
+    return this.runFunction(ast.args, state, this.metadata('ADDRESS'), (rowArg: Numeric, colArg: Numeric, absArg: Numeric, useA1Style: boolean, sheetName: string): InterpreterValue => {
+      // These are integer indices - truncation is appropriate
+      const row = rowArg.trunc().toNumber()  // Safe: integer row index
+      const col = colArg.trunc().toNumber()  // Safe: integer column index
+      const abs = absArg.trunc().toNumber()  // Safe: integer abs style (1-4)
       const argumentError = this.verifyAddressArguments(row, col, abs, useA1Style)
 
       if (argumentError !== undefined) {

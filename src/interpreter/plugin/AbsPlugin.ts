@@ -7,18 +7,28 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class AbsPlugin extends FunctionPlugin implements FunctionPluginTypecheck<AbsPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'ABS': {
       method: 'abs',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
   }
 
+  
+  /**
+   *
+   */
   public abs(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ABS'), Math.abs)
+    return this.runFunction(ast.args, state, this.metadata('ABS'), 
+      (arg: Numeric) => arg.abs()
+    )
   }
 }

@@ -10,6 +10,7 @@ import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue, RawScalarValue} from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {medianNumeric, largeNumeric, smallNumeric, Numeric} from '../../Numeric'
 
 /**
  * Interpreter plugin containing MEDIAN function
@@ -28,14 +29,14 @@ export class MedianPlugin extends FunctionPlugin implements FunctionPluginTypech
       method: 'large',
       parameters: [
         {argumentType: FunctionArgumentType.RANGE},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
     },
     'SMALL': {
       method: 'small',
       parameters: [
         {argumentType: FunctionArgumentType.RANGE},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
     },
   }
@@ -51,52 +52,58 @@ export class MedianPlugin extends FunctionPlugin implements FunctionPluginTypech
   public median(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('MEDIAN'),
       (...args: RawScalarValue[]) => {
-        const values = this.arithmeticHelper.coerceNumbersExactRanges(args)
-        if (values instanceof CellError) {
-          return values
+        const valuesPrecision = this.arithmeticHelper.coerceNumbersExactRanges(args)
+        if (valuesPrecision instanceof CellError) {
+          return valuesPrecision
         }
-        if (values.length === 0) {
+        if (valuesPrecision.length === 0) {
           return new CellError(ErrorType.NUM, ErrorMessage.OneValue)
         }
-        values.sort((a, b) => (a - b))
-        if (values.length % 2 === 0) {
-          return (values[(values.length / 2) - 1] + values[values.length / 2]) / 2
-        } else {
-          return values[Math.floor(values.length / 2)]
-        }
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return medianNumeric(valuesPrecision)
       })
   }
 
+  
+  /**
+   *
+   */
   public large(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LARGE'),
-      (range: SimpleRangeValue, n: number) => {
-        const vals = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
-        if (vals instanceof CellError) {
-          return vals
+      (range: SimpleRangeValue, nArg: Numeric) => {
+        const valsPrecision = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
+        if (valsPrecision instanceof CellError) {
+          return valsPrecision
         }
-        vals.sort((a, b) => a - b)
-        n = Math.trunc(n)
-        if (n > vals.length) {
+        // Safe: integer rank for LARGE/SMALL - no precision impact
+        const n = nArg.trunc().toNumber()
+        if (n > valsPrecision.length) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        return vals[vals.length - n]
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return largeNumeric(valsPrecision, n)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public small(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SMALL'),
-      (range: SimpleRangeValue, n: number) => {
-        const vals = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
-        if (vals instanceof CellError) {
-          return vals
+      (range: SimpleRangeValue, nArg: Numeric) => {
+        const valsPrecision = this.arithmeticHelper.manyToExactNumbers(range.valuesFromTopLeftCorner())
+        if (valsPrecision instanceof CellError) {
+          return valsPrecision
         }
-        vals.sort((a, b) => a - b)
-        n = Math.trunc(n)
-        if (n > vals.length) {
+        // Safe: integer rank for LARGE/SMALL - no precision impact
+        const n = nArg.trunc().toNumber()
+        if (n > valsPrecision.length) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        return vals[n - 1]
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return smallNumeric(valsPrecision, n)
       }
     )
   }

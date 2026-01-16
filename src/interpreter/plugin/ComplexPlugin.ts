@@ -10,14 +10,18 @@ import {coerceComplexToString, complex} from '../ArithmeticHelper'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue, RawInterpreterValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric, NumericProvider} from '../../Numeric'
 
+/**
+ * ComplexPlugin using complex (Numeric-based) for high-precision complex number calculations.
+ */
 export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypecheck<ComplexPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'COMPLEX': {
       method: 'complex',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision real part
+        {argumentType: FunctionArgumentType.NUMERIC},  // High precision imaginary part
         {argumentType: FunctionArgumentType.STRING, defaultValue: 'i'},
       ],
     },
@@ -167,7 +171,7 @@ export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypec
       method: 'impower',
       parameters: [
         {argumentType: FunctionArgumentType.COMPLEX},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
     },
     'IMSQRT': {
@@ -178,9 +182,13 @@ export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypec
     },
   }
 
+  
+  /**
+   * COMPLEX function - creates a complex number from real and imaginary parts.
+   */
   public complex(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('COMPLEX'),
-      (re: number, im: number, unit: string) => {
+      (re: Numeric, im: Numeric, unit: string) => {
         if (unit !== 'i' && unit !== 'j') {
           return new CellError(ErrorType.VALUE, ErrorMessage.ShouldBeIorJ)
         }
@@ -189,105 +197,188 @@ export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypec
     )
   }
 
+  
+  /**
+   * IMABS function - returns absolute value (modulus) of complex number.
+   */
   public imabs(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('IMABS'), abs)
+    return this.runFunction(ast.args, state, this.metadata('IMABS'),
+      (arg: complex) => absNumeric(arg)
+    )
   }
 
+  
+  /**
+   * IMAGINARY function - returns imaginary part of complex number.
+   */
   public imaginary(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMAGINARY'),
       ([_re, im]: complex) => im
     )
   }
 
+  
+  /**
+   * IMREAL function - returns real part of complex number.
+   */
   public imreal(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMREAL'),
       ([re, _im]: complex) => re
     )
   }
 
+  
+  /**
+   * IMARGUMENT function - returns argument (angle) of complex number.
+   */
   public imargument(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMARGUMENT'),
       ([re, im]: complex) => {
-        if (re === 0 && im === 0) {
+        const factory = NumericProvider.getGlobalFactory()
+        if (re.equals(factory.zero()) && im.equals(factory.zero())) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return Math.atan2(im, re)
+        return im.atan2(re)
       }
     )
   }
 
+  
+  /**
+   * IMCONJUGATE function - returns complex conjugate.
+   */
   public imconjugate(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCONJUGATE'),
-      ([re, im]: complex) => coerceComplexToString([re, -im])
+      ([re, im]: complex) => coerceComplexToString([re, im.neg()])
     )
   }
 
+  
+  /**
+   * IMCOS function - returns cosine of complex number.
+   */
   public imcos(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCOS'),
-      (arg: complex) => coerceComplexToString(cos(arg))
+      (arg: complex) => coerceComplexToString(cosNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMCOSH function - returns hyperbolic cosine of complex number.
+   */
   public imcosh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCOSH'),
-      (arg: complex) => coerceComplexToString(cosh(arg))
+      (arg: complex) => coerceComplexToString(coshNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMCOT function - returns cotangent of complex number.
+   */
   public imcot(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCOT'),
-      (arg: complex) => coerceComplexToString(div(cos(arg), sin(arg)))
+      (arg: complex) => coerceComplexToString(divNumeric(cosNumeric(arg), sinNumeric(arg)))
     )
   }
 
+  
+  /**
+   * IMCSC function - returns cosecant of complex number.
+   */
   public imcsc(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCSC'),
-      (arg: complex) => coerceComplexToString(div([1, 0], sin(arg)))
+      (arg: complex) => {
+        const factory = NumericProvider.getGlobalFactory()
+        return coerceComplexToString(divNumeric([factory.one(), factory.zero()], sinNumeric(arg)))
+      }
     )
   }
 
+  
+  /**
+   * IMCSCH function - returns hyperbolic cosecant of complex number.
+   */
   public imcsch(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMCSCH'),
-      (arg: complex) => coerceComplexToString(div([1, 0], sinh(arg)))
+      (arg: complex) => {
+        const factory = NumericProvider.getGlobalFactory()
+        return coerceComplexToString(divNumeric([factory.one(), factory.zero()], sinhNumeric(arg)))
+      }
     )
   }
 
+  
+  /**
+   * IMSEC function - returns secant of complex number.
+   */
   public imsec(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSEC'),
-      (arg: complex) => coerceComplexToString(div([1, 0], cos(arg)))
+      (arg: complex) => {
+        const factory = NumericProvider.getGlobalFactory()
+        return coerceComplexToString(divNumeric([factory.one(), factory.zero()], cosNumeric(arg)))
+      }
     )
   }
 
+  
+  /**
+   * IMSECH function - returns hyperbolic secant of complex number.
+   */
   public imsech(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSECH'),
-      (arg: complex) => coerceComplexToString(div([1, 0], cosh(arg)))
+      (arg: complex) => {
+        const factory = NumericProvider.getGlobalFactory()
+        return coerceComplexToString(divNumeric([factory.one(), factory.zero()], coshNumeric(arg)))
+      }
     )
   }
 
+  
+  /**
+   * IMSIN function - returns sine of complex number.
+   */
   public imsin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSIN'),
-      (arg: complex) => coerceComplexToString(sin(arg))
+      (arg: complex) => coerceComplexToString(sinNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMSINH function - returns hyperbolic sine of complex number.
+   */
   public imsinh(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSINH'),
-      (arg: complex) => coerceComplexToString(sinh(arg))
+      (arg: complex) => coerceComplexToString(sinhNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMTAN function - returns tangent of complex number.
+   */
   public imtan(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMTAN'),
-      (arg: complex) => coerceComplexToString(div(sin(arg), cos(arg)))
+      (arg: complex) => coerceComplexToString(divNumeric(sinNumeric(arg), cosNumeric(arg)))
     )
   }
 
+  
+  /**
+   * IMDIV function - divides two complex numbers.
+   */
   public imdiv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMDIV'),
-      (arg1: complex, arg2: complex) => coerceComplexToString(div(arg1, arg2))
+      (arg1: complex, arg2: complex) => coerceComplexToString(divNumeric(arg1, arg2))
     )
   }
 
+  
+  /**
+   * IMPRODUCT function - multiplies complex numbers.
+   */
   public improduct(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMPRODUCT'),
       (...args: RawInterpreterValue[]) => {
@@ -295,15 +386,20 @@ export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypec
         if (coerced instanceof CellError) {
           return coerced
         }
-        let prod: complex = [1, 0]
+        const factory = NumericProvider.getGlobalFactory()
+        let acc: complex = [factory.one(), factory.zero()]
         for (const val of coerced) {
-          prod = mul(prod, val)
+          acc = mulNumeric(acc, val)
         }
-        return coerceComplexToString(prod)
+        return coerceComplexToString(acc)
       }
     )
   }
 
+  
+  /**
+   * IMSUM function - adds complex numbers.
+   */
   public imsum(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSUM'),
       (...args: RawInterpreterValue[]) => {
@@ -311,113 +407,217 @@ export class ComplexPlugin extends FunctionPlugin implements FunctionPluginTypec
         if (coerced instanceof CellError) {
           return coerced
         }
-        let sum: complex = [0, 0]
+        const factory = NumericProvider.getGlobalFactory()
+        let acc: complex = [factory.zero(), factory.zero()]
         for (const val of coerced) {
-          sum = add(sum, val)
+          acc = addNumeric(acc, val)
         }
-        return coerceComplexToString(sum)
+        return coerceComplexToString(acc)
       }
     )
   }
 
+  
+  /**
+   * IMSUB function - subtracts two complex numbers.
+   */
   public imsub(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSUB'),
-      (arg1: complex, arg2: complex) => coerceComplexToString(sub(arg1, arg2))
+      (arg1: complex, arg2: complex) => coerceComplexToString(subNumeric(arg1, arg2))
     )
   }
 
+  
+  /**
+   * IMEXP function - returns exponential of complex number.
+   */
   public imexp(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMEXP'),
-      (arg: complex) => coerceComplexToString(exp(arg))
+      (arg: complex) => coerceComplexToString(expNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMLN function - returns natural logarithm of complex number.
+   */
   public imln(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMLN'),
-      (arg: complex) => coerceComplexToString(ln(arg))
+      (arg: complex) => coerceComplexToString(lnNumeric(arg))
     )
   }
 
+  
+  /**
+   * IMLOG10 function - returns base-10 logarithm of complex number.
+   */
   public imlog10(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMLOG10'),
       (arg: complex) => {
-        const [re, im] = ln(arg)
-        const c = Math.log(10)
-        return coerceComplexToString([re / c, im / c])
+        const factory = NumericProvider.getGlobalFactory()
+        const ln10 = factory.fromNumber(10).ln()
+        const result = lnNumeric(arg)
+        return coerceComplexToString([result[0].dividedBy(ln10), result[1].dividedBy(ln10)])
       }
     )
   }
 
+  
+  /**
+   * IMLOG2 function - returns base-2 logarithm of complex number.
+   */
   public imlog2(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMLOG2'),
       (arg: complex) => {
-        const [re, im] = ln(arg)
-        const c = Math.log(2)
-        return coerceComplexToString([re / c, im / c])
+        const factory = NumericProvider.getGlobalFactory()
+        const ln2 = factory.fromNumber(2).ln()
+        const result = lnNumeric(arg)
+        return coerceComplexToString([result[0].dividedBy(ln2), result[1].dividedBy(ln2)])
       }
     )
   }
 
+  
+  /**
+   * IMPOWER function - raises complex number to power.
+   */
   public impower(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMPOWER'),
-      (arg: complex, n: number) => coerceComplexToString(power(arg, n))
+      (arg: complex, n: Numeric) => coerceComplexToString(powerNumeric(arg, n))
     )
   }
 
+  
+  /**
+   * IMSQRT function - returns square root of complex number.
+   */
   public imsqrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('IMSQRT'),
-      (arg: complex) => coerceComplexToString(power(arg, 0.5))
+      (arg: complex) => {
+        const factory = NumericProvider.getGlobalFactory()
+        return coerceComplexToString(powerNumeric(arg, factory.fromNumber(0.5)))
+      }
     )
   }
 }
 
-function add([re1, im1]: complex, [re2, im2]: complex): complex {
-  return [re1 + re2, im1 + im2]
+// ============ HIGH-PRECISION COMPLEX NUMBER HELPER FUNCTIONS ============
+
+/**
+ * Add two complex numbers using Numeric.
+ */
+function addNumeric([re1, im1]: complex, [re2, im2]: complex): complex {
+  return [re1.plus(re2), im1.plus(im2)]
 }
 
-function sub([re1, im1]: complex, [re2, im2]: complex): complex {
-  return [re1 - re2, im1 - im2]
+/**
+ * Subtract two complex numbers using Numeric.
+ */
+function subNumeric([re1, im1]: complex, [re2, im2]: complex): complex {
+  return [re1.minus(re2), im1.minus(im2)]
 }
 
-function mul([re1, im1]: complex, [re2, im2]: complex): complex {
-  return [re1 * re2 - im1 * im2, re1 * im2 + re2 * im1]
+/**
+ * Multiply two complex numbers using Numeric.
+ * (a + bi)(c + di) = (ac - bd) + (ad + bc)i
+ */
+function mulNumeric([re1, im1]: complex, [re2, im2]: complex): complex {
+  return [
+    re1.times(re2).minus(im1.times(im2)),
+    re1.times(im2).plus(re2.times(im1))
+  ]
 }
 
-function div([re1, im1]: complex, [re2, im2]: complex): complex {
-  const denom = Math.pow(re2, 2) + Math.pow(im2, 2)
-  const [nomRe, nomIm] = mul([re1, im1], [re2, -im2])
-  return [nomRe / denom, nomIm / denom]
+/**
+ * Divide two complex numbers using Numeric.
+ * (a + bi)/(c + di) = ((a + bi)(c - di)) / (c² + d²)
+ */
+function divNumeric([re1, im1]: complex, [re2, im2]: complex): complex {
+  const denom = re2.pow(2).plus(im2.pow(2))
+  const [nomRe, nomIm] = mulNumeric([re1, im1], [re2, im2.neg()])
+  return [nomRe.dividedBy(denom), nomIm.dividedBy(denom)]
 }
 
-function cos([re, im]: complex): complex {
-  return [Math.cos(re) * Math.cosh(im), -Math.sin(re) * Math.sinh(im)]
+/**
+ * Complex cosine using Numeric.
+ * cos(a + bi) = cos(a)cosh(b) - i*sin(a)sinh(b)
+ */
+function cosNumeric([re, im]: complex): complex {
+  return [
+    re.cos().times(im.cosh()),
+    re.sin().neg().times(im.sinh())
+  ]
 }
 
-function cosh([re, im]: complex): complex {
-  return [Math.cosh(re) * Math.cos(im), Math.sinh(re) * Math.sin(im)]
+/**
+ * Complex hyperbolic cosine using Numeric.
+ * cosh(a + bi) = cosh(a)cos(b) + i*sinh(a)sin(b)
+ */
+function coshNumeric([re, im]: complex): complex {
+  return [
+    re.cosh().times(im.cos()),
+    re.sinh().times(im.sin())
+  ]
 }
 
-function sin([re, im]: complex): complex {
-  return [Math.sin(re) * Math.cosh(im), Math.cos(re) * Math.sinh(im)]
+/**
+ * Complex sine using Numeric.
+ * sin(a + bi) = sin(a)cosh(b) + i*cos(a)sinh(b)
+ */
+function sinNumeric([re, im]: complex): complex {
+  return [
+    re.sin().times(im.cosh()),
+    re.cos().times(im.sinh())
+  ]
 }
 
-function sinh([re, im]: complex): complex {
-  return [Math.sinh(re) * Math.cos(im), Math.cosh(re) * Math.sin(im)]
+/**
+ * Complex hyperbolic sine using Numeric.
+ * sinh(a + bi) = sinh(a)cos(b) + i*cosh(a)sin(b)
+ */
+function sinhNumeric([re, im]: complex): complex {
+  return [
+    re.sinh().times(im.cos()),
+    re.cosh().times(im.sin())
+  ]
 }
 
-function exp([re, im]: complex): complex {
-  return [Math.exp(re) * Math.cos(im), Math.exp(re) * Math.sin(im)]
+/**
+ * Complex exponential using Numeric.
+ * exp(a + bi) = exp(a)(cos(b) + i*sin(b))
+ */
+function expNumeric([re, im]: complex): complex {
+  const expRe = re.exp()
+  return [
+    expRe.times(im.cos()),
+    expRe.times(im.sin())
+  ]
 }
 
-function abs([re, im]: complex): number {
-  return Math.sqrt(re * re + im * im)
+/**
+ * Complex absolute value (modulus) using Numeric.
+ * |a + bi| = sqrt(a² + b²)
+ */
+function absNumeric([re, im]: complex): Numeric {
+  return re.pow(2).plus(im.pow(2)).sqrt()
 }
 
-function ln([re, im]: complex): complex {
-  return [Math.log(abs([re, im])), Math.atan2(im, re)]
+/**
+ * Complex natural logarithm using Numeric.
+ * ln(a + bi) = ln|z| + i*arg(z)
+ */
+function lnNumeric([re, im]: complex): complex {
+  return [
+    absNumeric([re, im]).ln(),
+    im.atan2(re)
+  ]
 }
 
-function power(arg: complex, n: number) {
-  const [re, im] = ln(arg)
-  return exp([n * re, n * im])
+/**
+ * Complex power using Numeric.
+ * z^n = exp(n * ln(z))
+ */
+function powerNumeric(arg: complex, n: Numeric): complex {
+  const [re, im] = lnNumeric(arg)
+  return expNumeric([n.times(re), n.times(im)])
 }

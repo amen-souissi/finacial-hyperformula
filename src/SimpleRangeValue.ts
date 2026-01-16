@@ -8,7 +8,8 @@ import {ArraySize} from './ArraySize'
 import {CellError, ErrorType, simpleCellAddress, SimpleCellAddress} from './Cell'
 import {DependencyGraph} from './DependencyGraph'
 import {ErrorMessage} from './error-message'
-import {InternalScalarValue, isExtendedNumber} from './interpreter/InterpreterValue'
+import {getRawPrecisionValue, InternalScalarValue, isExtendedNumber, toNativeNumeric} from './interpreter/InterpreterValue'
+import {Numeric, NumericProvider} from './Numeric'
 
 /**
  * A class that represents a range of data.
@@ -167,7 +168,8 @@ export class SimpleRangeValue {
       this._hasOnlyNumbers = true
       for (const row of this.data) {
         for (const v of row) {
-          if (typeof v !== 'number') {
+          // Check for both native numbers and Numeric
+          if (!isExtendedNumber(v)) {
             this._hasOnlyNumbers = false
             return false
           }
@@ -180,11 +182,38 @@ export class SimpleRangeValue {
 
   /**
    * Returns the range data as a 2D array of numbers.
+   * Converts Numeric to native numbers.
+   *
+   * @deprecated Use rawNumerics() for high-precision calculations.
+   * This method causes precision loss when converting Numeric to number.
+   * Only use when interfacing with external libraries that require number[].
    *
    * Internal use only.
    */
   public rawNumbers(): number[][] {
-    return this._data as number[][]
+    return this.data.map(row => row.map(v => {
+      if (isExtendedNumber(v)) {
+        return toNativeNumeric(getRawPrecisionValue(v))
+      }
+      // This should only be reached if hasOnlyNumbers() was not called first
+      return 0
+    }))
+  }
+
+  /**
+   * Returns the range values as a 2D array of Numeric values.
+   * Use this for high-precision calculations.
+   *
+   * Internal use only.
+   */
+  public rawNumerics(): Numeric[][] {
+    return this.data.map(row => row.map(v => {
+      if (isExtendedNumber(v)) {
+        return getRawPrecisionValue(v)
+      }
+      // This should only be reached if hasOnlyNumbers() was not called first
+      return NumericProvider.getGlobalFactory().zero()
+    }))
   }
 
 

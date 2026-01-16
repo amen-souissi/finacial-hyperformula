@@ -9,6 +9,7 @@ import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
 import {InterpreterValue, RawScalarValue} from '../InterpreterValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
 /**
  * Interpreter plugin containing text-specific functions
@@ -34,7 +35,7 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
       method: 'split',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ]
     },
     'LEN': {
@@ -53,8 +54,8 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
       method: 'mid',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ]
     },
     'TRIM': {
@@ -85,29 +86,29 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
       method: 'rept',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ]
     },
     'RIGHT': {
       method: 'right',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'LEFT': {
       method: 'left',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'REPLACE': {
       method: 'replace',
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
         {argumentType: FunctionArgumentType.STRING}
       ]
     },
@@ -116,7 +117,7 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'SUBSTITUTE': {
@@ -125,7 +126,7 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
         {argumentType: FunctionArgumentType.STRING},
         {argumentType: FunctionArgumentType.STRING},
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true}
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true}
       ]
     },
     'FIND': {
@@ -133,7 +134,7 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
       parameters: [
         {argumentType: FunctionArgumentType.STRING},
         {argumentType: FunctionArgumentType.STRING},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'UPPER': {
@@ -167,7 +168,9 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
    * @param state
    */
   public split(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('SPLIT'), (stringToSplit: string, indexToUse: number) => {
+    return this.runFunction(ast.args, state, this.metadata('SPLIT'), (stringToSplit: string, indexToUseArg: Numeric) => {
+      // Safe: integer array index - no precision impact
+      const indexToUse = indexToUseArg.trunc().toNumber()
       const splittedString = stringToSplit.split(' ')
 
       if (indexToUse >= splittedString.length || indexToUse < 0) {
@@ -178,18 +181,30 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public len(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LEN'), (arg: string) => {
       return arg.length
     })
   }
 
+  
+  /**
+   *
+   */
   public lower(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LOWER'), (arg: string) => {
       return arg.toLowerCase()
     })
   }
 
+  
+  /**
+   *
+   */
   public trim(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('TRIM'), (arg: string) => {
       return arg
@@ -199,12 +214,20 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public proper(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('PROPER'), (arg: string) => {
       return arg.replace(/\p{L}+/gu, word => word.charAt(0).toUpperCase() + word.substring(1).toLowerCase())
     })
   }
 
+  
+  /**
+   *
+   */
   public clean(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CLEAN'), (arg: string) => {
       // eslint-disable-next-line no-control-regex
@@ -212,14 +235,24 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public exact(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('EXACT'), (left: string, right: string) => {
       return left === right
     })
   }
 
+  
+  /**
+   *
+   */
   public rept(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('REPT'), (text: string, count: number) => {
+    return this.runFunction(ast.args, state, this.metadata('REPT'), (text: string, countArg: Numeric) => {
+      // Safe: integer repeat count - no precision impact
+      const count = countArg.trunc().toNumber()
       if (count < 0) {
         return new CellError(ErrorType.VALUE, ErrorMessage.NegativeCount)
       }
@@ -227,8 +260,14 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public right(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('RIGHT'), (text: string, length: number) => {
+    return this.runFunction(ast.args, state, this.metadata('RIGHT'), (text: string, lengthArg: Numeric) => {
+      // Safe: integer string length - no precision impact
+      const length = lengthArg.trunc().toNumber()
       if (length < 0) {
         return new CellError(ErrorType.VALUE, ErrorMessage.NegativeLength)
       } else if (length === 0) {
@@ -238,8 +277,14 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public left(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('LEFT'), (text: string, length: number) => {
+    return this.runFunction(ast.args, state, this.metadata('LEFT'), (text: string, lengthArg: Numeric) => {
+      // Safe: integer string length - no precision impact
+      const length = lengthArg.trunc().toNumber()
       if (length < 0) {
         return new CellError(ErrorType.VALUE, ErrorMessage.NegativeLength)
       }
@@ -247,8 +292,15 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public mid(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('MID'), (text: string, startPosition: number, numberOfChars: number) => {
+    return this.runFunction(ast.args, state, this.metadata('MID'), (text: string, startPositionArg: Numeric, numberOfCharsArg: Numeric) => {
+      // Safe: integer string positions - no precision impact
+      const startPosition = startPositionArg.trunc().toNumber()
+      const numberOfChars = numberOfCharsArg.trunc().toNumber()
       if (startPosition < 1) {
         return new CellError(ErrorType.VALUE, ErrorMessage.LessThanOne)
       }
@@ -259,8 +311,15 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public replace(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('REPLACE'), (text: string, startPosition: number, numberOfChars: number, newText: string) => {
+    return this.runFunction(ast.args, state, this.metadata('REPLACE'), (text: string, startPositionArg: Numeric, numberOfCharsArg: Numeric, newText: string) => {
+      // Safe: integer string positions - no precision impact
+      const startPosition = startPositionArg.trunc().toNumber()
+      const numberOfChars = numberOfCharsArg.trunc().toNumber()
       if (startPosition < 1) {
         return new CellError(ErrorType.VALUE, ErrorMessage.LessThanOne)
       }
@@ -271,8 +330,14 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public search(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('SEARCH'), (pattern: string, text: string, startIndex: number) => {
+    return this.runFunction(ast.args, state, this.metadata('SEARCH'), (pattern: string, text: string, startIndexArg: Numeric) => {
+      // Safe: integer string index - no precision impact
+      const startIndex = startIndexArg.trunc().toNumber()
       if (startIndex < 1 || startIndex > text.length) {
         return new CellError(ErrorType.VALUE, ErrorMessage.LengthBounds)
       }
@@ -288,10 +353,16 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public substitute(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('SUBSTITUTE'), (text: string, searchString: string, replacementString: string, occurrenceNum: number | undefined) => {
+    return this.runFunction(ast.args, state, this.metadata('SUBSTITUTE'), (text: string, searchString: string, replacementString: string, occurrenceNumArg: Numeric | undefined) => {
       const escapedSearchString = this.escapeRegExpSpecialCharacters(searchString)
       const searchRegExp = new RegExp(escapedSearchString, 'g')
+      // Safe: integer occurrence number - no precision impact
+      const occurrenceNum = occurrenceNumArg?.trunc().toNumber()
 
       if (occurrenceNum === undefined) {
         return text.replace(searchRegExp, replacementString)
@@ -313,8 +384,14 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public find(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('FIND'), (pattern, text: string, startIndex: number) => {
+    return this.runFunction(ast.args, state, this.metadata('FIND'), (pattern: string, text: string, startIndexArg: Numeric) => {
+      // Safe: integer string index - no precision impact
+      const startIndex = startIndexArg.trunc().toNumber()
       if (startIndex < 1 || startIndex > text.length) {
         return new CellError(ErrorType.VALUE, ErrorMessage.IndexBounds)
       }
@@ -326,6 +403,10 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public t(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T'), (arg: RawScalarValue) => {
       if (arg instanceof CellError) {
@@ -335,12 +416,20 @@ export class TextPlugin extends FunctionPlugin implements FunctionPluginTypechec
     })
   }
 
+  
+  /**
+   *
+   */
   public upper(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('UPPER'), (arg: string) => {
       return arg.toUpperCase()
     })
   }
 
+  
+  /**
+   *
+   */
   private escapeRegExpSpecialCharacters(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }

@@ -7,36 +7,49 @@ import {CellError, ErrorType} from '../../Cell'
 import {ErrorMessage} from '../../error-message'
 import {ProcedureAst} from '../../parser'
 import {InterpreterState} from '../InterpreterState'
-import {InterpreterValue, RawInterpreterValue} from '../InterpreterValue'
+import {InterpreterValue, RawInterpreterValue, isExtendedNumber, getRawPrecisionValue} from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {
+  NumericProvider,
+  gcdArrayNumeric,
+  lcmArrayNumeric,
+  seriesSumNumeric,
+  sumX2MinusY2Numeric,
+  sumX2PlusY2Numeric,
+  sumXMinusY2Numeric,
+  Numeric
+} from '../../Numeric'
 
+/**
+ *
+ */
 export class MathPlugin extends FunctionPlugin implements FunctionPluginTypecheck<MathPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'FACT': {
       method: 'fact',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 170}
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 170}
       ]
     },
     'FACTDOUBLE': {
       method: 'factdouble',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 288}
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 288}
       ]
     },
     'COMBIN': {
       method: 'combin',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, lessThan: 1030},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0}
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, lessThan: 1030},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0}
       ]
     },
     'COMBINA': {
       method: 'combina',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0}
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0}
       ]
     },
     'GCD': {
@@ -56,14 +69,14 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
     'MROUND': {
       method: 'mround',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
     },
     'MULTINOMIAL': {
       method: 'multinomial',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
       repeatLastArgs: 1,
       expandRanges: true,
@@ -71,23 +84,23 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
     'QUOTIENT': {
       method: 'quotient',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
     },
     'SERIESSUM': {
       method: 'seriessum',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
         {argumentType: FunctionArgumentType.RANGE},
       ],
     },
     'SIGN': {
       method: 'sign',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
       ],
     },
     'SUMX2MY2': {
@@ -113,183 +126,253 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
     },
   }
 
+  
+  /**
+   *
+   */
   public fact(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('FACT'),
-      (arg: number) => {
-        arg = Math.trunc(arg)
-        let ret = 1
-        for (let i = 1; i <= arg; i++) {
-          ret *= i
+      (argNumeric: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const argTrunc = argNumeric.trunc()
+        let ret = factory.one()
+        let i = factory.one()
+        const one = factory.one()
+        while (i.lessThanOrEqualTo(argTrunc)) {
+          ret = ret.times(i)
+          i = i.plus(one)
         }
         return ret
       })
   }
 
+  
+  /**
+   *
+   */
   public factdouble(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('FACTDOUBLE'),
-      (arg: number) => {
-        arg = Math.trunc(arg)
-        let ret = 1
-        for (let i = arg; i >= 1; i -= 2) {
-          ret *= i
+      (argNumeric: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const argTrunc = argNumeric.trunc()
+        let ret = factory.one()
+        const one = factory.one()
+        const two = factory.fromNumber(2)
+        let i = argTrunc
+        while (i.greaterThanOrEqualTo(one)) {
+          ret = ret.times(i)
+          i = i.minus(two)
         }
         return ret
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public combin(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('COMBIN'),
-      (n: number, m: number) => {
-        if (m > n) {
+      (nArg: Numeric, mArg: Numeric) => {
+        if (mArg.greaterThan(nArg)) {
           return new CellError(ErrorType.NUM, ErrorMessage.WrongOrder)
         }
-        n = Math.trunc(n)
-        m = Math.trunc(m)
-        return combin(n, m)
+        const n = nArg.trunc()
+        const m = mArg.trunc()
+        return combinNumeric(n, m)
       })
   }
 
+  
+  /**
+   *
+   */
   public combina(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('COMBINA'),
-      (n: number, m: number) => {
-        n = Math.trunc(n)
-        m = Math.trunc(m)
-        if (n + m - 1 >= 1030) {
+      (nArg: Numeric, mArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const n = nArg.trunc()
+        const m = mArg.trunc()
+        const limit = factory.fromNumber(1030)
+        // n + m - 1 >= 1030
+        if (n.plus(m).minus(factory.one()).greaterThanOrEqualTo(limit)) {
           //Product #2 does not enforce this
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        if (n === 0 && m === 0) {
-          return 1
+        if (n.isZero() && m.isZero()) {
+          return factory.one()
         }
-        return combin(n + m - 1, m)
+        return combinNumeric(n.plus(m).minus(factory.one()), m)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public gcd(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('GCD'),
       (...args: RawInterpreterValue[]) => {
-        const processedArgs = this.arithmeticHelper.coerceNumbersCoerceRangesDropNulls(args)
-        if (processedArgs instanceof CellError) {
-          return processedArgs
+        const processedArgsPrecision = this.arithmeticHelper.coerceNumbersCoerceRangesDropNulls(args)
+        if (processedArgsPrecision instanceof CellError) {
+          return processedArgsPrecision
         }
-        let ret = 0
-        for (const val of processedArgs) {
-          if (val < 0) {
+        for (const val of processedArgsPrecision) {
+          if (val.isNegative()) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          ret = binaryGCD(ret, Math.trunc(val))
         }
-        if (ret > Number.MAX_SAFE_INTEGER) {
+        const result = gcdArrayNumeric(processedArgsPrecision)
+        // Check MAX_SAFE_INTEGER using Numeric comparison
+        const maxSafeNumeric = NumericProvider.getGlobalFactory().fromNumber(Number.MAX_SAFE_INTEGER)
+        if (result.greaterThan(maxSafeNumeric)) {
           //inconsistency with product #1
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        return ret
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return result
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public lcm(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LCM'),
       (...args: RawInterpreterValue[]) => {
-        const processedArgs = this.arithmeticHelper.coerceNumbersCoerceRangesDropNulls(args)
-        if (processedArgs instanceof CellError) {
-          return processedArgs
+        const processedArgsPrecision = this.arithmeticHelper.coerceNumbersCoerceRangesDropNulls(args)
+        if (processedArgsPrecision instanceof CellError) {
+          return processedArgsPrecision
         }
-        let ret = 1
-        for (const val of processedArgs) {
-          if (val < 0) {
+        for (const val of processedArgsPrecision) {
+          if (val.isNegative()) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          ret = binaryLCM(ret, Math.trunc(val))
         }
-        if (ret > Number.MAX_SAFE_INTEGER) {
+        const result = lcmArrayNumeric(processedArgsPrecision)
+        // Check MAX_SAFE_INTEGER using Numeric comparison
+        const maxSafeNumeric = NumericProvider.getGlobalFactory().fromNumber(Number.MAX_SAFE_INTEGER)
+        if (result.greaterThan(maxSafeNumeric)) {
           //inconsistency with product #1
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        return ret
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return result
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public mround(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('MROUND'),
-      (nom: number, denom: number) => {
-        if (denom === 0) {
-          return 0
+      (nomArg: Numeric, denomArg: Numeric) => {
+        const factory = NumericProvider.getGlobalFactory()
+        const zero = factory.zero()
+        if (denomArg.isZero()) {
+          return zero
         }
-        if ((nom > 0 && denom < 0) || (nom < 0 && denom > 0)) {
+        // Check if signs are different (nom > 0 && denom < 0) || (nom < 0 && denom > 0)
+        if ((nomArg.isPositive() && denomArg.isNegative()) || (nomArg.isNegative() && denomArg.isPositive())) {
           return new CellError(ErrorType.NUM, ErrorMessage.DistinctSigns)
         }
-        return Math.round(nom / denom) * denom
+        // Math.round(nom / denom) * denom
+        return nomArg.dividedBy(denomArg).round().times(denomArg)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public multinomial(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('MULTINOMIAL'),
-      (...args: number[]) => {
-        let n = 0
-        let ans = 1
-        for (let arg of args) {
-          if (arg < 0) {
+      (...argsNumeric: Numeric[]) => {
+        const factory = NumericProvider.getGlobalFactory()
+        let n = factory.zero()
+        let ans = factory.one()
+        const one = factory.one()
+        for (const argNumeric of argsNumeric) {
+          if (argNumeric.isNegative()) {
             return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
           }
-          arg = Math.trunc(arg)
-          for (let i = 1; i <= arg; i++) {
-            ans *= (n + i) / i
+          const arg = argNumeric.trunc()
+          let i = one
+          while (i.lessThanOrEqualTo(arg)) {
+            // ans *= (n + i) / i
+            ans = ans.times(n.plus(i)).dividedBy(i)
+            i = i.plus(one)
           }
-          n += arg
+          n = n.plus(arg)
         }
-        return Math.round(ans)
+        return ans.round()
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public quotient(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('QUOTIENT'),
-      (nom: number, denom: number) => {
-        if (denom === 0) {
+      (nomArg: Numeric, denomArg: Numeric) => {
+        if (denomArg.isZero()) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
-        return Math.trunc(nom / denom)
+        // Math.trunc(nom / denom)
+        return nomArg.dividedBy(denomArg).trunc()
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public seriessum(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SERIESSUM'),
-      (x: number, n: number, m: number, range: SimpleRangeValue) => {
-        const coefs = this.arithmeticHelper.manyToOnlyNumbersDropNulls(range.valuesFromTopLeftCorner())
-        if (coefs instanceof CellError) {
-          return coefs
+      (xArg: Numeric, nArg: Numeric, mArg: Numeric, range: SimpleRangeValue) => {
+        const coefsPrecision = this.arithmeticHelper.manyToOnlyNumbersDropNulls(range.valuesFromTopLeftCorner())
+        if (coefsPrecision instanceof CellError) {
+          return coefsPrecision
         }
-        let ret = 0
-        coefs.reverse()
-        for (const coef of coefs) {
-          ret *= Math.pow(x, m)
-          ret += coef
-        }
-        return ret * Math.pow(x, n)
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return seriesSumNumeric(xArg, nArg, mArg, coefsPrecision)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public sign(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SIGN'),
-      (arg: number) => {
-        if (arg > 0) {
-          return 1
-        } else if (arg < 0) {
-          return -1
-        } else {
+      (argNumeric: Numeric) => {
+        // Check isZero first since isPositive might return true for 0 in some implementations
+        if (argNumeric.isZero()) {
           return 0
+        } else if (argNumeric.isPositive()) {
+          return 1
+        } else {
+          return -1
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public sumx2my2(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SUMX2MY2'),
       (rangeX: SimpleRangeValue, rangeY: SimpleRangeValue) => {
@@ -298,9 +381,9 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
         if (valsX.length !== valsY.length) {
           return new CellError(ErrorType.NA, ErrorMessage.EqualLength)
         }
-        const n = valsX.length
-        let ret = 0
-        for (let i = 0; i < n; i++) {
+        const arrX: Numeric[] = []
+        const arrY: Numeric[] = []
+        for (let i = 0; i < valsX.length; i++) {
           const valX = valsX[i]
           const valY = valsY[i]
           if (valX instanceof CellError) {
@@ -309,15 +392,21 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
           if (valY instanceof CellError) {
             return valY
           }
-          if (typeof valX === 'number' && typeof valY === 'number') {
-            ret += Math.pow(valX, 2) - Math.pow(valY, 2)
+          if (isExtendedNumber(valX) && isExtendedNumber(valY)) {
+            arrX.push(getRawPrecisionValue(valX))
+            arrY.push(getRawPrecisionValue(valY))
           }
         }
-        return ret
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return sumX2MinusY2Numeric(arrX, arrY)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public sumx2py2(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SUMX2PY2'),
       (rangeX: SimpleRangeValue, rangeY: SimpleRangeValue) => {
@@ -326,9 +415,9 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
         if (valsX.length !== valsY.length) {
           return new CellError(ErrorType.NA, ErrorMessage.EqualLength)
         }
-        const n = valsX.length
-        let ret = 0
-        for (let i = 0; i < n; i++) {
+        const arrX: Numeric[] = []
+        const arrY: Numeric[] = []
+        for (let i = 0; i < valsX.length; i++) {
           const valX = valsX[i]
           const valY = valsY[i]
           if (valX instanceof CellError) {
@@ -337,15 +426,21 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
           if (valY instanceof CellError) {
             return valY
           }
-          if (typeof valX === 'number' && typeof valY === 'number') {
-            ret += Math.pow(valX, 2) + Math.pow(valY, 2)
+          if (isExtendedNumber(valX) && isExtendedNumber(valY)) {
+            arrX.push(getRawPrecisionValue(valX))
+            arrY.push(getRawPrecisionValue(valY))
           }
         }
-        return ret
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return sumX2PlusY2Numeric(arrX, arrY)
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public sumxmy2(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('SUMXMY2'),
       (rangeX: SimpleRangeValue, rangeY: SimpleRangeValue) => {
@@ -354,9 +449,9 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
         if (valsX.length !== valsY.length) {
           return new CellError(ErrorType.NA, ErrorMessage.EqualLength)
         }
-        const n = valsX.length
-        let ret = 0
-        for (let i = 0; i < n; i++) {
+        const arrX: Numeric[] = []
+        const arrY: Numeric[] = []
+        for (let i = 0; i < valsX.length; i++) {
           const valX = valsX[i]
           const valY = valsY[i]
           if (valX instanceof CellError) {
@@ -365,40 +460,35 @@ export class MathPlugin extends FunctionPlugin implements FunctionPluginTypechec
           if (valY instanceof CellError) {
             return valY
           }
-          if (typeof valX === 'number' && typeof valY === 'number') {
-            ret += Math.pow(valX - valY, 2)
+          if (isExtendedNumber(valX) && isExtendedNumber(valY)) {
+            arrX.push(getRawPrecisionValue(valX))
+            arrY.push(getRawPrecisionValue(valY))
           }
         }
-        return ret
+        // Return Numeric directly - conversion to number happens at output (Exporter)
+        return sumXMinusY2Numeric(arrX, arrY)
       }
     )
   }
 }
 
-function combin(n: number, m: number): number {
-  if (2 * m > n) {
-    m = n - m
+/**
+ * Combination using Numeric for high precision
+ */
+function combinNumeric(n: Numeric, m: Numeric): Numeric {
+  const factory = NumericProvider.getGlobalFactory()
+  const two = factory.fromNumber(2)
+  // if 2 * m > n, use m = n - m for optimization
+  if (two.times(m).greaterThan(n)) {
+    m = n.minus(m)
   }
-  let ret = 1
-  for (let i = 1; i <= m; i++) {
-    ret *= (n - m + i) / i
+  let ret = factory.one()
+  const one = factory.one()
+  let i = one
+  while (i.lessThanOrEqualTo(m)) {
+    // ret *= (n - m + i) / i
+    ret = ret.times(n.minus(m).plus(i)).dividedBy(i)
+    i = i.plus(one)
   }
-  return Math.round(ret)
-}
-
-function binaryGCD(a: number, b: number): number {
-  if (a < b) {
-    [a, b] = [b, a]
-  }
-  while (b > 0) {
-    [a, b] = [b, a % b]
-  }
-  return a
-}
-
-function binaryLCM(a: number, b: number): number {
-  if (a === 0 || b === 0) {
-    return 0
-  }
-  return a * (b / binaryGCD(a, b))
+  return ret.round()
 }

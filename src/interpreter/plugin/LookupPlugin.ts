@@ -16,7 +16,11 @@ import { InternalScalarValue, InterpreterValue, RawNoErrorScalarValue } from '..
 import { SimpleRangeValue } from '../../SimpleRangeValue'
 import { FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions } from './FunctionPlugin'
 import { ArraySize } from '../../ArraySize'
+import {Numeric} from '../../Numeric'
 
+/**
+ *
+ */
 export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypecheck<LookupPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'VLOOKUP': {
@@ -24,7 +28,7 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
       parameters: [
         { argumentType: FunctionArgumentType.NOERROR },
         { argumentType: FunctionArgumentType.RANGE },
-        { argumentType: FunctionArgumentType.NUMBER },
+        { argumentType: FunctionArgumentType.NUMERIC },
         { argumentType: FunctionArgumentType.BOOLEAN, defaultValue: true },
       ],
     },
@@ -33,7 +37,7 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
       parameters: [
         { argumentType: FunctionArgumentType.NOERROR },
         { argumentType: FunctionArgumentType.RANGE },
-        { argumentType: FunctionArgumentType.NUMBER },
+        { argumentType: FunctionArgumentType.NUMERIC },
         { argumentType: FunctionArgumentType.BOOLEAN, defaultValue: true },
       ]
     },
@@ -50,9 +54,9 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
         // [if_not_found]
         { argumentType: FunctionArgumentType.SCALAR, optionalArg: true, defaultValue: ErrorType.NA },
         // [match_mode]
-        { argumentType: FunctionArgumentType.NUMBER, optionalArg: true, defaultValue: 0 },
+        { argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, defaultValue: 0 },
         // [search_mode]
-        { argumentType: FunctionArgumentType.NUMBER, optionalArg: true, defaultValue: 1 },
+        { argumentType: FunctionArgumentType.NUMERIC, optionalArg: true, defaultValue: 1 },
       ]
     },
     'MATCH': {
@@ -60,7 +64,7 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
       parameters: [
         { argumentType: FunctionArgumentType.NOERROR },
         { argumentType: FunctionArgumentType.RANGE },
-        { argumentType: FunctionArgumentType.NUMBER, defaultValue: 1 },
+        { argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1 },
       ]
     },
   }
@@ -73,8 +77,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
    * @param state
    */
   public vlookup(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('VLOOKUP'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, index: number, sorted: boolean) => {
+    return this.runFunction(ast.args, state, this.metadata('VLOOKUP'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, indexArg: Numeric, sorted: boolean) => {
       const range = rangeValue.range
+      // Safe: integer column index - no precision impact
+      const index = indexArg.trunc().toNumber()
 
       if (range === undefined) {
         return new CellError(ErrorType.VALUE, ErrorMessage.WrongType)
@@ -104,8 +110,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
    * @param state
    */
   public hlookup(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('HLOOKUP'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, index: number, sorted: boolean) => {
+    return this.runFunction(ast.args, state, this.metadata('HLOOKUP'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, indexArg: Numeric, sorted: boolean) => {
       const range = rangeValue.range
+      // Safe: integer row index - no precision impact
+      const index = indexArg.trunc().toNumber()
       if (range === undefined) {
         return new CellError(ErrorType.VALUE, ErrorMessage.WrongType)
       }
@@ -134,7 +142,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
    * @param state
    */
   public xlookup(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('XLOOKUP'), (key: RawNoErrorScalarValue, lookupRangeValue: SimpleRangeValue, returnRangeValue: SimpleRangeValue, notFoundFlag: any, matchMode: number, searchMode: number) => {
+    return this.runFunction(ast.args, state, this.metadata('XLOOKUP'), (key: RawNoErrorScalarValue, lookupRangeValue: SimpleRangeValue, returnRangeValue: SimpleRangeValue, notFoundFlag: any, matchModeArg: Numeric, searchModeArg: Numeric) => {
+      // Safe: integer mode values - validation requires exact values, no precision impact for integers
+      const matchMode = matchModeArg.toNumber()
+      const searchMode = searchModeArg.toNumber()
       if (![0, -1, 1, 2].includes(matchMode)) {
         return new CellError(ErrorType.VALUE, ErrorMessage.BadMode)
       }
@@ -160,6 +171,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     })
   }
 
+  
+  /**
+   *
+   */
   public xlookupArraySize(ast: ProcedureAst): ArraySize {
     const lookupRange = ast?.args?.[1] as CellRange
     const returnRange  = ast?.args?.[2] as CellRange
@@ -191,12 +206,21 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     return new ArraySize(1, returnRangeHeight)
   }
 
+  
+  /**
+   *
+   */
   public match(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('MATCH'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, type: number) => {
-      return this.doMatch(zeroIfEmpty(key), rangeValue, type)
+    return this.runFunction(ast.args, state, this.metadata('MATCH'), (key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, typeArg: Numeric) => {
+      // Safe: integer match type - validation requires exact values, no precision impact for integers
+      return this.doMatch(zeroIfEmpty(key), rangeValue, typeArg.toNumber())
     })
   }
 
+  
+  /**
+   *
+   */
   protected searchInRange(key: RawNoErrorScalarValue, range: SimpleRangeValue, isWildcardMatchMode: boolean, searchOptions: SearchOptions, searchStrategy: SearchStrategy): number {
     if (isWildcardMatchMode && typeof key === 'string' && this.arithmeticHelper.requiresRegex(key)) {
       return searchStrategy.advancedFind(
@@ -209,6 +233,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     return searchStrategy.find(key, range, searchOptions)
   }
 
+  
+  /**
+   *
+   */
   private doVlookup(key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, index: number, searchOptions: SearchOptions): InternalScalarValue {
     this.dependencyGraph.stats.start(StatType.VLOOKUP)
     const range = rangeValue.range
@@ -240,6 +268,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     return value
   }
 
+  
+  /**
+   *
+   */
   private doHlookup(key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, index: number, searchOptions: SearchOptions): InternalScalarValue {
     const range = rangeValue.range
     let searchedRange
@@ -268,6 +300,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     return value
   }
 
+  
+  /**
+   *
+   */
   private doXlookup(key: RawNoErrorScalarValue, lookupRange: SimpleRangeValue, returnRange: SimpleRangeValue, notFoundFlag: any, isWildcardMatchMode: boolean, searchOptions: SearchOptions): InterpreterValue {
     const isVerticalSearch = lookupRange.width() === 1 && returnRange.height() === lookupRange.height()
     const isHorizontalSearch = lookupRange.height() === 1 && returnRange.width() === lookupRange.width()
@@ -287,6 +323,10 @@ export class LookupPlugin extends FunctionPlugin implements FunctionPluginTypech
     return SimpleRangeValue.onlyValues(returnValues)
   }
 
+  
+  /**
+   *
+   */
   private doMatch(key: RawNoErrorScalarValue, rangeValue: SimpleRangeValue, type: number): InternalScalarValue {
     if (![-1, 0, 1].includes(type)) {
       return new CellError(ErrorType.VALUE, ErrorMessage.BadMode)

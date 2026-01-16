@@ -11,6 +11,7 @@ import {InterpreterState} from '../InterpreterState'
 import {EmptyValue, InternalScalarValue, InterpreterValue, isExtendedNumber} from '../InterpreterValue'
 import {SimpleRangeValue} from '../../SimpleRangeValue'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
 /**
  * Interpreter plugin containing information functions
@@ -108,8 +109,8 @@ export class InformationPlugin extends FunctionPlugin implements FunctionPluginT
       method: 'index',
       parameters: [
         {argumentType: FunctionArgumentType.RANGE},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'NA': {
@@ -421,7 +422,10 @@ export class InformationPlugin extends FunctionPlugin implements FunctionPluginT
    * @param state
    */
   public index(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('INDEX'), (rangeValue: SimpleRangeValue, row: number, col: number) => {
+    return this.runFunction(ast.args, state, this.metadata('INDEX'), (rangeValue: SimpleRangeValue, rowArg: Numeric, colArg: Numeric) => {
+      // Safe: integer row/col indices - no precision impact
+      const row = rowArg.trunc().toNumber()
+      const col = colArg.trunc().toNumber()
       if (col < 1 || row < 1) {
         return new CellError(ErrorType.VALUE, ErrorMessage.LessThanOne)
       }

@@ -31,360 +31,373 @@ import {
   weibull
 } from './3rdparty/jstat/jstat'
 import {FunctionArgumentType, FunctionPlugin, FunctionPluginTypecheck, ImplementedFunctions} from './FunctionPlugin'
+import {Numeric} from '../../Numeric'
 
+/**
+ * Statistical functions plugin.
+ * 
+ * PRECISION NOTE: All .toNumber() conversions in this plugin are required for 
+ * compatibility with the jstat library (3rdparty/jstat/jstat), which only accepts
+ * native JavaScript numbers. While this may cause precision loss for very large
+ * or very precise numbers, it is the only way to leverage jstat's statistical
+ * distribution functions (normal, gamma, beta, binomial, etc.).
+ * 
+ * Future improvement: Implement native Numeric versions of these statistical
+ * distribution functions to eliminate the need for .toNumber() conversions.
+ */
 export class StatisticalPlugin extends FunctionPlugin implements FunctionPluginTypecheck<StatisticalPlugin> {
   public static implementedFunctions: ImplementedFunctions = {
     'ERF': {
       method: 'erf',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, optionalArg: true},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, optionalArg: true},
       ]
     },
     'ERFC': {
       method: 'erfc',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'EXPON.DIST': {
       method: 'expondist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'FISHER': {
       method: 'fisher',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: -1, lessThan: 1}
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: -1, lessThan: 1}
       ]
     },
     'FISHERINV': {
       method: 'fisherinv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'GAMMA': {
       method: 'gamma',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'GAMMA.DIST': {
       method: 'gammadist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'GAMMALN': {
       method: 'gammaln',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0}
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0}
       ]
     },
     'GAMMA.INV': {
       method: 'gammainv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ]
     },
     'GAUSS': {
       method: 'gauss',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'BETA.DIST': {
       method: 'betadist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'BETA.INV': {
       method: 'betainv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, defaultValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, defaultValue: 1},
       ]
     },
     'BINOM.DIST': {
       method: 'binomialdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'BINOM.INV': {
       method: 'binomialinv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
       ]
     },
     'BESSELI': {
       method: 'besselifn',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ]
     },
     'BESSELJ': {
       method: 'besseljfn',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ]
     },
     'BESSELK': {
       method: 'besselkfn',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ]
     },
     'BESSELY': {
       method: 'besselyfn',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
       ]
     },
     'CHISQ.DIST': {
       method: 'chisqdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1, maxValue: 1e10},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1, maxValue: 1e10},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'CHISQ.DIST.RT': {
       method: 'chisqdistrt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1, maxValue: 1e10},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1, maxValue: 1e10},
       ]
     },
     'CHISQ.INV': {
       method: 'chisqinv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1, maxValue: 1e10},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1, maxValue: 1e10},
       ]
     },
     'CHISQ.INV.RT': {
       method: 'chisqinvrt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'F.DIST': {
       method: 'fdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'F.DIST.RT': {
       method: 'fdistrt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'F.INV': {
       method: 'finv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'F.INV.RT': {
       method: 'finvrt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'WEIBULL.DIST': {
       method: 'weibulldist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'POISSON.DIST': {
       method: 'poissondist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'HYPGEOM.DIST': {
       method: 'hypgeomdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'T.DIST': {
       method: 'tdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'T.DIST.2T': {
       method: 'tdist2t',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'T.DIST.RT': {
       method: 'tdistrt',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'TDIST': {
       method: 'tdistold',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
         {argumentType: FunctionArgumentType.INTEGER, minValue: 1, maxValue: 2},
       ]
     },
     'T.INV': {
       method: 'tinv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'T.INV.2T': {
       method: 'tinv2t',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, maxValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ]
     },
     'LOGNORM.DIST': {
       method: 'lognormdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'LOGNORM.INV': {
       method: 'lognorminv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ]
     },
     'NORM.DIST': {
       method: 'normdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'NORM.INV': {
       method: 'norminv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ]
     },
     'NORM.S.DIST': {
       method: 'normsdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
+        {argumentType: FunctionArgumentType.NUMERIC},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'NORM.S.INV': {
       method: 'normsinv',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
       ]
     },
     'PHI': {
       method: 'phi',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER}
+        {argumentType: FunctionArgumentType.NUMERIC}
       ]
     },
     'NEGBINOM.DIST': {
       method: 'negbinomdist',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 0, maxValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 0, maxValue: 1},
         {argumentType: FunctionArgumentType.BOOLEAN},
       ]
     },
     'CONFIDENCE.NORM': {
       method: 'confidencenorm',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
     },
     'CONFIDENCE.T': {
       method: 'confidencet',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0, lessThan: 1},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
-        {argumentType: FunctionArgumentType.NUMBER, minValue: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0, lessThan: 1},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC, minValue: 1},
       ],
     },
     'STANDARDIZE': {
       method: 'standardize',
       parameters: [
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER},
-        {argumentType: FunctionArgumentType.NUMBER, greaterThan: 0},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC},
+        {argumentType: FunctionArgumentType.NUMERIC, greaterThan: 0},
       ],
     },
   }
@@ -426,130 +439,198 @@ export class StatisticalPlugin extends FunctionPlugin implements FunctionPluginT
     POISSONDIST: 'POISSON.DIST',
   }
 
+  
+  /**
+   *
+   */
   public erf(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ERF'), (lowerBound, upperBound) => {
+    return this.runFunction(ast.args, state, this.metadata('ERF'), (lowerBound: Numeric, upperBound?: Numeric) => {
       if (upperBound === undefined) {
-        return erf(lowerBound)
+        return erf(lowerBound.toNumber())
       } else {
-        return erf(upperBound) - erf(lowerBound)
+        return erf(upperBound.toNumber()) - erf(lowerBound.toNumber())
       }
     })
   }
 
+  
+  /**
+   *
+   */
   public erfc(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('ERFC'), erfc)
+    return this.runFunction(ast.args, state, this.metadata('ERFC'), (x: Numeric) => erfc(x.toNumber()))
   }
 
+  
+  /**
+   *
+   */
   public expondist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('EXPON.DIST'),
-      (x: number, lambda: number, cumulative: boolean) => {
+      (x: Numeric, lambda: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return exponential.cdf(x, lambda)
+          return exponential.cdf(x.toNumber(), lambda.toNumber())
         } else {
-          return exponential.pdf(x, lambda)
+          return exponential.pdf(x.toNumber(), lambda.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public fisher(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('FISHER'),
-      (x: number) => Math.log((1 + x) / (1 - x)) / 2
+      (x: Numeric) => {
+        const xNum = x.toNumber()
+        return Math.log((1 + xNum) / (1 - xNum)) / 2
+      }
     )
   }
 
+  
+  /**
+   *
+   */
   public fisherinv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('FISHERINV'),
-      (y: number) => 1 - 2 / (Math.exp(2 * y) + 1)
+      (y: Numeric) => 1 - 2 / (Math.exp(2 * y.toNumber()) + 1)
     )
   }
 
+  
+  /**
+   *
+   */
   public gamma(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('GAMMA'), gammafn)
+    return this.runFunction(ast.args, state, this.metadata('GAMMA'), (x: Numeric) => gammafn(x.toNumber()))
   }
 
+  
+  /**
+   *
+   */
   public gammadist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('GAMMA.DIST'),
-      (value: number, alphaVal: number, betaVal: number, cumulative: boolean) => {
+      (value: Numeric, alphaVal: Numeric, betaVal: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return gamma.cdf(value, alphaVal, betaVal)
+          return gamma.cdf(value.toNumber(), alphaVal.toNumber(), betaVal.toNumber())
         } else {
-          return gamma.pdf(value, alphaVal, betaVal)
+          return gamma.pdf(value.toNumber(), alphaVal.toNumber(), betaVal.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public gammaln(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('GAMMALN'), gammaln)
+    return this.runFunction(ast.args, state, this.metadata('GAMMALN'), (x: Numeric) => gammaln(x.toNumber()))
   }
 
+  
+  /**
+   *
+   */
   public gammainv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
-    return this.runFunction(ast.args, state, this.metadata('GAMMA.INV'), gamma.inv)
+    return this.runFunction(ast.args, state, this.metadata('GAMMA.INV'), (p: Numeric, a: Numeric, b: Numeric) => gamma.inv(p.toNumber(), a.toNumber(), b.toNumber()))
   }
 
+  
+  /**
+   *
+   */
   public gauss(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('GAUSS'),
-      (z: number) => normal.cdf(z, 0, 1) - 0.5
+      (z: Numeric) => normal.cdf(z.toNumber(), 0, 1) - 0.5
     )
   }
 
+  
+  /**
+   *
+   */
   public betadist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BETA.DIST'),
-      (x: number, alphaVal: number, betaVal: number, cumulative: boolean, A: number, B: number) => {
-        if (x <= A) {
+      (xArg: Numeric, alphaVal: Numeric, betaVal: Numeric, cumulative: boolean, A: Numeric, B: Numeric) => {
+        let x = xArg.toNumber()
+        const ANum = A.toNumber()
+        const BNum = B.toNumber()
+        if (x <= ANum) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueSmall)
-        } else if (x >= B) {
+        } else if (x >= BNum) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
-        x = (x - A) / (B - A)
+        x = (x - ANum) / (BNum - ANum)
         if (cumulative) {
-          return beta.cdf(x, alphaVal, betaVal)
+          return beta.cdf(x, alphaVal.toNumber(), betaVal.toNumber())
         } else {
-          return beta.pdf(x, alphaVal, betaVal)
+          return beta.pdf(x, alphaVal.toNumber(), betaVal.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public betainv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BETA.INV'),
-      (x: number, alphaVal: number, betaVal: number, A: number, B: number) => {
-        if (A >= B) {
+      (x: Numeric, alphaVal: Numeric, betaVal: Numeric, A: Numeric, B: Numeric) => {
+        const ANum = A.toNumber()
+        const BNum = B.toNumber()
+        if (ANum >= BNum) {
           return new CellError(ErrorType.NUM, ErrorMessage.WrongOrder)
         } else {
-          return beta.inv(x, alphaVal, betaVal) * (B - A) + A
+          return beta.inv(x.toNumber(), alphaVal.toNumber(), betaVal.toNumber()) * (BNum - ANum) + ANum
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public binomialdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BINOM.DIST'),
-      (succ: number, trials: number, prob: number, cumulative: boolean) => {
+      (succArg: Numeric, trialsArg: Numeric, prob: Numeric, cumulative: boolean) => {
+        let succ = succArg.toNumber()
+        let trials = trialsArg.toNumber()
         if (succ > trials) {
           return new CellError(ErrorType.NUM, ErrorMessage.WrongOrder)
         }
         succ = Math.trunc(succ)
         trials = Math.trunc(trials)
         if (cumulative) {
-          return binomial.cdf(succ, trials, prob)
+          return binomial.cdf(succ, trials, prob.toNumber())
         } else {
-          return binomial.pdf(succ, trials, prob)
+          return binomial.pdf(succ, trials, prob.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public binomialinv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BINOM.INV'),
-      (trials: number, prob: number, alpha: number) => {
-        trials = Math.trunc(trials)
+      (trialsArg: Numeric, prob: Numeric, alpha: Numeric) => {
+        const trials = Math.trunc(trialsArg.toNumber())
+        const probNum = prob.toNumber()
+        const alphaNum = alpha.toNumber()
         let lower = -1
         let upper = trials
         while (upper > lower + 1) {
           const mid = Math.trunc((lower + upper) / 2)
-          if (binomial.cdf(mid, trials, prob) >= alpha) {
+          if (binomial.cdf(mid, trials, probNum) >= alphaNum) {
             upper = mid
           } else {
             lower = mid
@@ -560,121 +641,185 @@ export class StatisticalPlugin extends FunctionPlugin implements FunctionPluginT
     )
   }
 
+  
+  /**
+   *
+   */
   public besselifn(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BESSELI'),
-      (x: number, n: number) => besseli(x, Math.trunc(n))
+      (x: Numeric, n: Numeric) => besseli(x.toNumber(), Math.trunc(n.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public besseljfn(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BESSELJ'),
-      (x: number, n: number) => besselj(x, Math.trunc(n))
+      (x: Numeric, n: Numeric) => besselj(x.toNumber(), Math.trunc(n.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public besselkfn(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BESSELK'),
-      (x: number, n: number) => besselk(x, Math.trunc(n))
+      (x: Numeric, n: Numeric) => besselk(x.toNumber(), Math.trunc(n.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public besselyfn(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('BESSELY'),
-      (x: number, n: number) => bessely(x, Math.trunc(n))
+      (x: Numeric, n: Numeric) => bessely(x.toNumber(), Math.trunc(n.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public chisqdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CHISQ.DIST'),
-      (x: number, deg: number, cumulative: boolean) => {
-        deg = Math.trunc(deg)
+      (x: Numeric, deg: Numeric, cumulative: boolean) => {
+        const degNum = Math.trunc(deg.toNumber())
         if (cumulative) {
-          return chisquare.cdf(x, deg)
+          return chisquare.cdf(x.toNumber(), degNum)
         } else {
-          return chisquare.pdf(x, deg)
+          return chisquare.pdf(x.toNumber(), degNum)
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public chisqdistrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CHISQ.DIST.RT'),
-      (x: number, deg: number) => 1 - chisquare.cdf(x, Math.trunc(deg))
+      (x: Numeric, deg: Numeric) => 1 - chisquare.cdf(x.toNumber(), Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public chisqinv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CHISQ.INV'),
-      (p: number, deg: number) => chisquare.inv(p, Math.trunc(deg))
+      (p: Numeric, deg: Numeric) => chisquare.inv(p.toNumber(), Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public chisqinvrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CHISQ.INV.RT'),
-      (p: number, deg: number) => chisquare.inv(1.0 - p, Math.trunc(deg))
+      (p: Numeric, deg: Numeric) => chisquare.inv(1.0 - p.toNumber(), Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public fdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('F.DIST'),
-      (x: number, deg1: number, deg2: number, cumulative: boolean) => {
-        deg1 = Math.trunc(deg1)
-        deg2 = Math.trunc(deg2)
+      (x: Numeric, deg1: Numeric, deg2: Numeric, cumulative: boolean) => {
+        const deg1Num = Math.trunc(deg1.toNumber())
+        const deg2Num = Math.trunc(deg2.toNumber())
         if (cumulative) {
-          return centralF.cdf(x, deg1, deg2)
+          return centralF.cdf(x.toNumber(), deg1Num, deg2Num)
         } else {
-          return centralF.pdf(x, deg1, deg2)
+          return centralF.pdf(x.toNumber(), deg1Num, deg2Num)
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public fdistrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('F.DIST.RT'),
-      (x: number, deg1: number, deg2: number) => 1 - centralF.cdf(x, Math.trunc(deg1), Math.trunc(deg2))
+      (x: Numeric, deg1: Numeric, deg2: Numeric) => 1 - centralF.cdf(x.toNumber(), Math.trunc(deg1.toNumber()), Math.trunc(deg2.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public finv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('F.INV'),
-      (p: number, deg1: number, deg2: number) => centralF.inv(p, Math.trunc(deg1), Math.trunc(deg2))
+      (p: Numeric, deg1: Numeric, deg2: Numeric) => centralF.inv(p.toNumber(), Math.trunc(deg1.toNumber()), Math.trunc(deg2.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public finvrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('F.INV.RT'),
-      (p: number, deg1: number, deg2: number) => centralF.inv(1.0 - p, Math.trunc(deg1), Math.trunc(deg2))
+      (p: Numeric, deg1: Numeric, deg2: Numeric) => centralF.inv(1.0 - p.toNumber(), Math.trunc(deg1.toNumber()), Math.trunc(deg2.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public weibulldist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('WEIBULL.DIST'),
-      (x: number, shape: number, scale: number, cumulative: boolean) => {
+      (x: Numeric, shape: Numeric, scale: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return weibull.cdf(x, scale, shape)
+          return weibull.cdf(x.toNumber(), scale.toNumber(), shape.toNumber())
         } else {
-          return weibull.pdf(x, scale, shape)
+          return weibull.pdf(x.toNumber(), scale.toNumber(), shape.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public poissondist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('POISSON.DIST'),
-      (x: number, mean: number, cumulative: boolean) => {
-        x = Math.trunc(x)
+      (xArg: Numeric, mean: Numeric, cumulative: boolean) => {
+        const x = Math.trunc(xArg.toNumber())
         if (cumulative) {
-          return poisson.cdf(x, mean)
+          return poisson.cdf(x, mean.toNumber())
         } else {
-          return poisson.pdf(x, mean)
+          return poisson.pdf(x, mean.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public hypgeomdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('HYPGEOM.DIST'),
-      (s: number, numberS: number, populationS: number, numberPop: number, cumulative: boolean) => {
+      (sArg: Numeric, numberSArg: Numeric, populationSArg: Numeric, numberPopArg: Numeric, cumulative: boolean) => {
+        let s = sArg.toNumber()
+        let numberS = numberSArg.toNumber()
+        let populationS = populationSArg.toNumber()
+        let numberPop = numberPopArg.toNumber()
         if (s > numberS || s > populationS || numberS > numberPop || populationS > numberPop) {
           return new CellError(ErrorType.NUM, ErrorMessage.ValueLarge)
         }
@@ -695,148 +840,216 @@ export class StatisticalPlugin extends FunctionPlugin implements FunctionPluginT
     )
   }
 
+  
+  /**
+   *
+   */
   public tdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T.DIST'),
-      (x: number, deg: number, cumulative: boolean) => {
-        deg = Math.trunc(deg)
+      (x: Numeric, deg: Numeric, cumulative: boolean) => {
+        const degNum = Math.trunc(deg.toNumber())
         if (cumulative) {
-          return studentt.cdf(x, deg)
+          return studentt.cdf(x.toNumber(), degNum)
         } else {
-          return studentt.pdf(x, deg)
+          return studentt.pdf(x.toNumber(), degNum)
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public tdist2t(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T.DIST.2T'),
-      (x: number, deg: number) => (1 - studentt.cdf(x, Math.trunc(deg))) * 2
+      (x: Numeric, deg: Numeric) => (1 - studentt.cdf(x.toNumber(), Math.trunc(deg.toNumber()))) * 2
     )
   }
 
+  
+  /**
+   *
+   */
   public tdistrt(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T.DIST.RT'),
-      (x: number, deg: number) => 1 - studentt.cdf(x, Math.trunc(deg))
+      (x: Numeric, deg: Numeric) => 1 - studentt.cdf(x.toNumber(), Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public tdistold(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('TDIST'),
-      (x: number, deg: number, mode: number) => mode * (1 - studentt.cdf(x, Math.trunc(deg)))
+      (x: Numeric, deg: Numeric, mode: number) => mode * (1 - studentt.cdf(x.toNumber(), Math.trunc(deg.toNumber())))
     )
   }
 
+  
+  /**
+   *
+   */
   public tinv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T.INV'),
-      (p: number, deg: number) => studentt.inv(p, Math.trunc(deg))
+      (p: Numeric, deg: Numeric) => studentt.inv(p.toNumber(), Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public tinv2t(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('T.INV.2T'),
-      (p: number, deg: number) => studentt.inv(1 - p / 2, Math.trunc(deg))
+      (p: Numeric, deg: Numeric) => studentt.inv(1 - p.toNumber() / 2, Math.trunc(deg.toNumber()))
     )
   }
 
+  
+  /**
+   *
+   */
   public lognormdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LOGNORM.DIST'),
-      (x: number, mean: number, stddev: number, cumulative: boolean) => {
+      (x: Numeric, mean: Numeric, stddev: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return lognormal.cdf(x, mean, stddev)
+          return lognormal.cdf(x.toNumber(), mean.toNumber(), stddev.toNumber())
         } else {
-          return lognormal.pdf(x, mean, stddev)
+          return lognormal.pdf(x.toNumber(), mean.toNumber(), stddev.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public lognorminv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('LOGNORM.INV'),
-      (p: number, mean: number, stddev: number) => lognormal.inv(p, mean, stddev)
+      (p: Numeric, mean: Numeric, stddev: Numeric) => lognormal.inv(p.toNumber(), mean.toNumber(), stddev.toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public normdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NORM.DIST'),
-      (x: number, mean: number, stddev: number, cumulative: boolean) => {
+      (x: Numeric, mean: Numeric, stddev: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return normal.cdf(x, mean, stddev)
+          return normal.cdf(x.toNumber(), mean.toNumber(), stddev.toNumber())
         } else {
-          return normal.pdf(x, mean, stddev)
+          return normal.pdf(x.toNumber(), mean.toNumber(), stddev.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public norminv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NORM.INV'),
-      (p: number, mean: number, stddev: number) => normal.inv(p, mean, stddev)
+      (p: Numeric, mean: Numeric, stddev: Numeric) => normal.inv(p.toNumber(), mean.toNumber(), stddev.toNumber())
     )
   }
 
+  
+  /**
+   *
+   */
   public normsdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NORM.S.DIST'),
-      (x: number, cumulative: boolean) => {
+      (x: Numeric, cumulative: boolean) => {
         if (cumulative) {
-          return normal.cdf(x, 0, 1)
+          return normal.cdf(x.toNumber(), 0, 1)
         } else {
-          return normal.pdf(x, 0, 1)
+          return normal.pdf(x.toNumber(), 0, 1)
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public normsinv(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NORM.S.INV'),
-      (p: number) => normal.inv(p, 0, 1)
+      (p: Numeric) => normal.inv(p.toNumber(), 0, 1)
     )
   }
 
+  
+  /**
+   *
+   */
   public phi(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('PHI'),
-      (x: number) => normal.pdf(x, 0, 1)
+      (x: Numeric) => normal.pdf(x.toNumber(), 0, 1)
     )
   }
 
+  
+  /**
+   *
+   */
   public negbinomdist(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('NEGBINOM.DIST'),
-      (nf: number, ns: number, p: number, cumulative: boolean) => {
-        nf = Math.trunc(nf)
-        ns = Math.trunc(ns)
+      (nfArg: Numeric, nsArg: Numeric, p: Numeric, cumulative: boolean) => {
+        const nf = Math.trunc(nfArg.toNumber())
+        const ns = Math.trunc(nsArg.toNumber())
         if (cumulative) {
-          return negbin.cdf(nf, ns, p)
+          return negbin.cdf(nf, ns, p.toNumber())
         } else {
-          return negbin.pdf(nf, ns, p)
+          return negbin.pdf(nf, ns, p.toNumber())
         }
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public confidencenorm(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CONFIDENCE.NORM'),
       // eslint-disable-next-line
       // @ts-ignore
-      (alpha: number, stddev: number, size: number) => normalci(1, alpha, stddev, Math.trunc(size))[1] - 1
+      (alpha: Numeric, stddev: Numeric, size: Numeric) => normalci(1, alpha.toNumber(), stddev.toNumber(), Math.trunc(size.toNumber()))[1] - 1
     )
   }
 
+  
+  /**
+   *
+   */
   public confidencet(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('CONFIDENCE.T'),
-      (alpha: number, stddev: number, size: number) => {
-        size = Math.trunc(size)
+      (alpha: Numeric, stddev: Numeric, sizeArg: Numeric) => {
+        const size = Math.trunc(sizeArg.toNumber())
         if (size === 1) {
           return new CellError(ErrorType.DIV_BY_ZERO)
         }
         // eslint-disable-next-line
         // @ts-ignore
-        return tci(1, alpha, stddev, size)[1] - 1
+        return tci(1, alpha.toNumber(), stddev.toNumber(), size)[1] - 1
       }
     )
   }
 
+  
+  /**
+   *
+   */
   public standardize(ast: ProcedureAst, state: InterpreterState): InterpreterValue {
     return this.runFunction(ast.args, state, this.metadata('STANDARDIZE'),
-      (x: number, mean: number, stddev: number) => (x - mean) / stddev
+      (x: Numeric, mean: Numeric, stddev: Numeric) => (x.toNumber() - mean.toNumber()) / stddev.toNumber()
     )
   }
 }
